@@ -125,3 +125,253 @@ button {
     }
   }
 }
+.narcotic-form {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #13263c;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  background: #fff;
+}
+
+.narcotic-form__title {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 16px;
+  line-height: 1.4;
+}
+
+.narcotic-form__row {
+  margin-bottom: 12px;
+}
+
+.narcotic-form__row--split {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.narcotic-form__inline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.narcotic-form__field {
+  margin-bottom: 12px;
+}
+
+.narcotic-form__label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.narcotic-form__value {
+  border-bottom: 1px dashed #cbd5e1;
+  padding: 4px 2px;
+  min-height: 22px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.narcotic-form__value--multiline {
+  min-height: 44px;
+  white-space: pre-wrap;
+}
+
+.narcotic-form__underline {
+  border-bottom: 1px dashed #cbd5e1;
+  padding: 0 6px;
+  min-width: 40px;
+  display: inline-block;
+  text-align: center;
+  font-weight: 600;
+}
+.narcotic-form {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #13263c;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  background: #fff;
+}
+
+.narcotic-form__title {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.narcotic-form__row {
+  margin-bottom: 12px;
+}
+
+.narcotic-form__row--split {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.narcotic-form__inline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.narcotic-form__field {
+  margin-bottom: 12px;
+}
+
+.narcotic-form__label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.narcotic-form__hint {
+  font-size: 11px;
+  color: #94a3b8;
+  align-self: flex-end;
+}
+
+.narcotic-form__value {
+  border-bottom: 1px dashed #cbd5e1;
+  padding: 4px 2px;
+  min-height: 22px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.narcotic-form__value--multiline {
+  min-height: 44px;
+  white-space: pre-wrap;
+}
+
+.narcotic-form__underline {
+  border-bottom: 1px dashed #cbd5e1;
+  padding: 0 6px;
+  min-width: 40px;
+  display: inline-block;
+  text-align: center;
+  font-weight: 600;
+}
+.dose-calc {
+  border: 1px dashed #c7d2fe;
+  background: #eef2ff;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.dose-calc__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.dose-calc__toggle {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+}
+
+.dose-calc__toggle-btn {
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  border-radius: 6px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.dose-calc__toggle-btn:hover {
+  color: #173653;
+}
+
+.dose-calc__toggle-btn--active {
+  background: #173653;
+  color: #fff;
+}
+
+.dose-calc__weight {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dose-calc__weight-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.dose-calc__weight-input {
+  width: 72px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #13263c;
+  outline: none;
+}
+
+.dose-calc__weight-input:focus {
+  border-color: #356181;
+}
+
+.dose-calc__weight-unit {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.dose-calc__result {
+  margin-top: 8px;
+}
+
+.dose-calc__hint {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.dose-calc__formula {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+
+.dose-calc__formula-part {
+  font-size: 11.5px;
+  color: #64748b;
+}
+
+.dose-calc__value {
+  font-size: 15px;
+  font-weight: 800;
+  color: #173653;
+}
+
+.dose-calc__unit {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.dose-calc__note {
+  margin-top: 6px;
+  font-size: 11px;
+  color: #94a3b8;
+}

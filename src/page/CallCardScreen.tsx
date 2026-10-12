@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../DB/supabase.js";
+import { fetchTemplateForIcd10 } from "../DB/queries.ts";
+import type { DiseaseTemplateFull } from "../DB/queries.ts";
+import { flattenMedications } from "../utils/normalize.ts";
 import MedicalField from "../components/MedicalField.tsx";
+import MedicationsList from "../components/MedicationsList.tsx";
+import TacticsList from "../components/TacticsList.tsx";
+// import RecipesList from "../components/RecipesList.tsx";
+import NarcoticForm from "../components/NarcoticForm.tsx";
 
 const ICD10_FIELDS = "ID, MKB_CODE, MKB_NAME, ID_PARENT, REC_CODE";
-const TEMPLATE_FIELDS = "COMPLAINTS, ANAMNESIS, OBJECTIVELY, LOCAL_STATUS";
 
 type Icd10Item = {
   ID: number;
@@ -13,14 +19,6 @@ type Icd10Item = {
   REC_CODE: string;
 };
 
-type DiseaseTemplate = {
-  COMPLAINTS: string | null;
-  ANAMNESIS: string | null;
-  OBJECTIVELY: string | null;
-  LOCAL_STATUS: string | null;
-};
-
-// --- Загрузка детей (или корней при parentId === null) ---
 async function fetchChildren(parentId: number | null): Promise<Icd10Item[]> {
   let builder = supabase
     .from("ICD10")
@@ -43,7 +41,6 @@ async function fetchChildren(parentId: number | null): Promise<Icd10Item[]> {
   return (data as Icd10Item[]) ?? [];
 }
 
-// --- Поиск (плоский список) ---
 async function searchIcd10(query: string): Promise<Icd10Item[]> {
   const q = query.trim().replace(/[%_]/g, "");
   if (q.length < 2) return [];
@@ -63,40 +60,22 @@ async function searchIcd10(query: string): Promise<Icd10Item[]> {
   return (data as Icd10Item[]) ?? [];
 }
 
-// --- Шаблон ---
-async function fetchTemplate(icd10Id: number): Promise<DiseaseTemplate | null> {
-  const { data, error } = await supabase
-    .from("DISEASE_TEMPLATES")
-    .select(TEMPLATE_FIELDS)
-    .eq("ICD10_ID", icd10Id) // ← замени на реальное имя FK
-    .maybeSingle();
-
-  if (error && error.code !== "PGRST116") {
-    console.error("fetchTemplate error:", error);
-    return null;
-  }
-  return (data as DiseaseTemplate) ?? null;
-}
-
 const EMPTY = "—";
 
 export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   const [query, setQuery] = useState("");
 
-  // Дерево: map<parentId, children>. Ключ "root" для корней.
   const [nodes, setNodes] = useState<Record<string, Icd10Item[]>>({});
-  const [expanded, setExpanded] = useState<Set<number>>(new Set()); // раскрытые ID
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [loadingNodes, setLoadingNodes] = useState<Set<number | "root">>(
     new Set(),
   );
 
-  // Поиск
   const [searchResults, setSearchResults] = useState<Icd10Item[]>([]);
   const [searching, setSearching] = useState(false);
 
-  // Выбранный диагноз + шаблон
   const [selected, setSelected] = useState<Icd10Item | null>(null);
-  const [template, setTemplate] = useState<DiseaseTemplate | null>(null);
+  const [template, setTemplate] = useState<DiseaseTemplateFull | null>(null);
   const [loadingTemplate, setLoadingTemplate] = useState(false);
 
   const reqIdRef = useRef(0);
@@ -142,12 +121,10 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     return () => clearTimeout(t);
   }, [query]);
 
-  // --- Раскрытие / сворачивание узла ---
   async function toggleNode(item: Icd10Item) {
     const id = item.ID;
 
     if (expanded.has(id)) {
-      // Сворачиваем
       setExpanded((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -156,7 +133,6 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    // Раскрываем: если детей ещё нет — грузим
     if (!nodes[id]) {
       setLoadingNodes((s) => new Set(s).add(id));
       const children = await fetchChildren(id);
@@ -168,13 +144,11 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
 
       setNodes((n) => ({ ...n, [id]: children }));
 
-      // Если детей нет — это лист, открываем карту
       if (children.length === 0) {
         handlePickLeaf(item);
         return;
       }
     } else if (nodes[id].length === 0) {
-      // Уже знаем, что детей нет — открываем карту
       handlePickLeaf(item);
       return;
     }
@@ -182,24 +156,22 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     setExpanded((prev) => new Set(prev).add(id));
   }
 
-  // --- Открыть карту для листа ---
-  async function handlePickLeaf(item: Icd10Item) {
+  // --- Загрузка шаблона для выбранного ICD10 ---
+  async function loadTemplateFor(item: Icd10Item) {
     setSelected(item);
     setTemplate(null);
     setLoadingTemplate(true);
-    const tpl = await fetchTemplate(item.ID);
+    const tpl = await fetchTemplateForIcd10(item.ID);
     setTemplate(tpl);
     setLoadingTemplate(false);
   }
 
-  // --- Открыть карту из поиска (сразу, без дерева) ---
+  async function handlePickLeaf(item: Icd10Item) {
+    await loadTemplateFor(item);
+  }
+
   async function handlePickFromSearch(item: Icd10Item) {
-    setSelected(item);
-    setTemplate(null);
-    setLoadingTemplate(true);
-    const tpl = await fetchTemplate(item.ID);
-    setTemplate(tpl);
-    setLoadingTemplate(false);
+    await loadTemplateFor(item);
   }
 
   const cardFields = useMemo(
@@ -212,7 +184,8 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     [template],
   );
 
-  // --- Рекурсивный рендер узла дерева ---
+  const medications = useMemo(() => flattenMedications(template), [template]);
+
   function renderNode(item: Icd10Item, depth: number) {
     const id = item.ID;
     const isExpanded = expanded.has(id);
@@ -318,7 +291,6 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
       </header>
 
       <div className="mx-auto max-w-3xl space-y-4 px-4 pb-14 pt-5 sm:px-8">
-        {/* --- Список: поиск или дерево --- */}
         {!selected && (
           <section>
             <div className="mb-2.5 flex items-center justify-between px-1">
@@ -342,7 +314,6 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
 
             <div className="overflow-hidden rounded-2xl bg-white shadow-[0_4px_24px_rgba(20,42,65,0.06)]">
               {searchMode ? (
-                // --- Поиск: плоский список ---
                 searchResults.length ? (
                   searchResults.map((item) => (
                     <button
@@ -371,8 +342,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
                     </div>
                   )
                 )
-              ) : // --- Дерево ---
-              loadingNodes.has("root") && !nodes.root ? (
+              ) : loadingNodes.has("root") && !nodes.root ? (
                 <p className="px-5 py-6 text-sm text-slate-400">Загрузка…</p>
               ) : (
                 (nodes.root ?? []).map((item) => renderNode(item, 0))
@@ -381,7 +351,6 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
           </section>
         )}
 
-        {/* --- Карточка выбранного диагноза --- */}
         {selected && (
           <article className="overflow-hidden rounded-2xl bg-white shadow-[0_6px_30px_rgba(20,42,65,0.08)]">
             <div className="border-b border-slate-100 p-5">
@@ -411,6 +380,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
               </button>
             </div>
 
+            {/* Общие поля */}
             <section className="px-5 pb-1 pt-5">
               <div className="mb-1 flex items-center gap-2.5">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-[#e8eff5] text-[#24415e]">
@@ -446,6 +416,23 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
               )}
             </section>
 
+            {/* Лекарства */}
+            <section className="border-t-[7px] border-[#f2f5f7] px-5 py-5">
+              <div className="mb-5 flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                  ⚕️
+                </span>
+                <div>
+                  <h3 className="text-[15px] font-extrabold">Лекарства</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Рекомендованные препараты
+                  </p>
+                </div>
+              </div>
+              <MedicationsList items={medications} />
+            </section>
+
+            {/* Тактика */}
             <section className="border-t-[7px] border-[#f2f5f7] px-5 py-5">
               <div className="mb-5 flex items-center gap-2.5">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-amber-50 text-amber-600">
@@ -454,13 +441,15 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
                 <div>
                   <h3 className="text-[15px] font-extrabold">Тактика</h3>
                   <p className="text-[11px] text-slate-400">
-                    Алгоритм действий
+                    Дозы и рекомендации по применению
                   </p>
                 </div>
               </div>
-              <p className="text-[13px] text-slate-400">{EMPTY}</p>
+              <TacticsList items={medications} />
             </section>
 
+            {/* Рецепты */}
+            {/* Рецепты — бланки НС/ПВ */}
             <section className="border-t-[7px] border-[#f2f5f7] px-5 py-5">
               <div className="mb-4 flex items-center gap-2.5">
                 <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
@@ -469,11 +458,27 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
                 <div>
                   <h3 className="text-[15px] font-extrabold">Рецепты</h3>
                   <p className="text-[11px] text-slate-400">
-                    По данному вызову
+                    Бланки учёта НС/ПВ по данному вызову
                   </p>
                 </div>
               </div>
-              <p className="text-[13px] text-slate-400">{EMPTY}</p>
+
+              {medications.filter((m) => m.recipe?.trim()).length === 0 ? (
+                <p className="text-[13px] text-slate-400">{EMPTY}</p>
+              ) : (
+                <div className="space-y-4">
+                  {medications
+                    .filter((m) => m.recipe?.trim())
+                    .map((m) => (
+                      <NarcoticForm
+                        key={m.id}
+                        recipe={m.recipe}
+                        mkbCode={selected?.MKB_CODE ?? null}
+                        mkbName={selected?.MKB_NAME ?? null}
+                      />
+                    ))}
+                </div>
+              )}
             </section>
           </article>
         )}

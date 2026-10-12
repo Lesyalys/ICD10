@@ -20,9 +20,7 @@ export default function MenuScreen({ onOpen }: { onOpen: () => void }) {
               onClick={onOpen}
               type="button"
             >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-white text-[#10213b] shadow-lg shadow-black/10">
-                {/* <Icon name="ambulance" className="size-6" /> */}
-              </span>
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-white text-[#10213b] shadow-lg shadow-black/10"></span>
               <span className="min-w-0 flex-1">
                 <span className="font-inter-bold block text-2xl leading-none">
                   СМП
@@ -31,10 +29,6 @@ export default function MenuScreen({ onOpen }: { onOpen: () => void }) {
                   Примеры карт скорой медецинской помощи
                 </span>
               </span>
-              {/* <Icon */}
-              {/* name="arrow" */}
-              {/* className="size-5 text-white/70 transition-transform group-hover:translate-x-1" */}
-              {/* /> */}
             </button>
           </div>
         </div>
