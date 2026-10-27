@@ -1,7 +1,7 @@
+// src/utils/normalize.ts
 import type {
-  AtxAmbulanceItem,
   AtxItem,
-  DiseaseTemplateFull,
+  MedicationWithTactics,
   TactikItem,
 } from "../DB/queries.ts";
 
@@ -10,57 +10,71 @@ export function first<T>(v: T | T[] | null | undefined): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
-export type MedicationView = {
+export type MedicationTactic = {
   id: number;
-  atcCode: string | null;
-  atcName: string | null;
-  atcNameEng: string | null;
-  name: string | null;
-  content: string | null;
-  unit: string | null;
+  text: string | null;
+  routes: string | null;
+  condition: string | null;
   doseA: number | null;
   doseC: number | null;
   recipe: string | null;
-  tactik: {
-    text: string | null;
-    routes: string | null;
-    next: string | null;
-  } | null;
+  next: string | null;
+  priority: string | null;
 };
 
+export type MedicationView = {
+  id: number;
+  name: string | null;
+  content: string | null;
+  unit: string | null;
+  atcCode: string | null;
+  atcName: string | null;
+  atcNameEng: string | null;
+  icd10Id: number | null;
+  tactics: MedicationTactic[];
+};
+
+function atxToView(a: AtxItem | null): {
+  atcCode: string | null;
+  atcName: string | null;
+  atcNameEng: string | null;
+} {
+  return {
+    atcCode: a?.ATC_CODE ?? null,
+    atcName: a?.ATC_NAME ?? null,
+    atcNameEng: a?.ATC_NAME_ENG ?? null,
+  };
+}
+
+function tacticToView(t: TactikItem): MedicationTactic {
+  return {
+    id: t.ID,
+    text: t.TACTIK_TEXT,
+    routes: t.ROUTES,
+    condition: t.CONDITION,
+    doseA: t.DOSE_A,
+    doseC: t.DOSE_C,
+    recipe: t.RECIPE,
+    next: t.NEXT_TACTIK,
+    priority: t.PRIORITY,
+  };
+}
+
+export function toMedicationView(m: MedicationWithTactics): MedicationView {
+  const atx = atxToView(first(m.med.АТХ));
+  return {
+    id: m.med.ID,
+    name: m.med.NAME,
+    content: m.med.CONTENT,
+    unit: m.med.UNIT,
+    icd10Id: m.med._icd10Id ?? null,
+    ...atx,
+    tactics: m.tactics.map(tacticToView),
+  };
+}
+
 export function flattenMedications(
-  template: DiseaseTemplateFull | null,
+  items: MedicationWithTactics[] | null,
 ): MedicationView[] {
-  const rows = template?.ATX_TEMPLATES_INFO ?? [];
-  const out: MedicationView[] = [];
-
-  for (const row of rows) {
-    const m: AtxAmbulanceItem | null = first(row.ATX_AMBULANCE);
-    if (!m) continue;
-
-    const atx: AtxItem | null = first(m.АТХ);
-    const tactik: TactikItem | null = first(m.TACTIK);
-
-    out.push({
-      id: m.ID,
-      atcCode: atx?.ATC_CODE ?? null,
-      atcName: atx?.ATC_NAME ?? null,
-      atcNameEng: atx?.ATC_NAME_ENG ?? null,
-      name: m.NAME,
-      content: m.CONTENT,
-      unit: m.UNIT,
-      doseA: m.DOSE_A,
-      doseC: m.DOSE_C,
-      recipe: m.RECIPE,
-      tactik: tactik
-        ? {
-            text: tactik.TACTIK_TEXT,
-            routes: tactik.ROUTES,
-            next: tactik.NEXT_TACTIK,
-          }
-        : null,
-    });
-  }
-
-  return out;
+  return (items ?? []).map(toMedicationView);
 }

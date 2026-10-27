@@ -1,21 +1,57 @@
-export default function MedicalField({
-  label,
-  children,
-}: {
+// src/components/MedicalField.tsx
+import { useState, type ReactNode } from "react";
+
+type Props = {
   label: string;
-  children: string;
-}) {
+  children: ReactNode;
+};
+
+export default function MedicalField({ label, children }: Props) {
+  const [copied, setCopied] = useState(false);
+
+  const text =
+    typeof children === "string" || typeof children === "number"
+      ? String(children)
+      : "";
+
+  async function handleCopy() {
+    if (!text) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (err) {
+      console.error("copy error:", err);
+    }
+  }
+
   return (
-    <div className="border-b border-slate-100 py-4 last:border-0">
-      <p className="text-[10px] font-bold tracking-[0.12em] text-slate-400 uppercase">
-        {label}
-        <span className="ml-2 p-1 border-2 border-blue-300 rounded-2xl bg-blue-10 hover:bg-blue-200 cursor-pointer transition-colors">
-          copy
-        </span>
-      </p>
-      <p className="mt-1.5 text-[14px] leading-relaxed text-[#263a4e]">
-        {children}
-      </p>
+    <div className="medical-field">
+      <div className="medical-field__header">
+        <div className="medical-field__label">{label}</div>
+        {text && (
+          <button
+            type="button"
+            className="medical-field__copy"
+            onClick={handleCopy}
+            title="Скопировать"
+          >
+            {copied ? "✓ Скопировано" : "Копировать"}
+          </button>
+        )}
+      </div>
+      <div className="medical-field__value">{children}</div>
     </div>
   );
 }

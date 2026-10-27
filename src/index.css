@@ -375,3 +375,837 @@ button {
   font-size: 11px;
   color: #94a3b8;
 }
+/* MedicalField */
+.medical-field {
+  margin-bottom: 12px;
+}
+
+.medical-field__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.medical-field__label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #444;
+}
+
+.medical-field__copy {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  min-width: 110px;
+  text-align: center;
+}
+
+.medical-field__copy:hover {
+  background: #e0e7ff;
+}
+
+.medical-field__value {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.5;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+/* NarcoticForm */
+.narcotic-form {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #13263c;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 18px;
+  background: #fff;
+}
+
+.narcotic-form__title {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+
+.narcotic-form__row {
+  margin-bottom: 12px;
+}
+
+.narcotic-form__row--split {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.narcotic-form__inline {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.narcotic-form__field {
+  margin-bottom: 12px;
+}
+
+.narcotic-form__label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.narcotic-form__hint {
+  font-size: 11px;
+  color: #94a3b8;
+  align-self: flex-end;
+}
+
+.narcotic-form__value {
+  border-bottom: 1px dashed #cbd5e1;
+  padding: 4px 2px;
+  min-height: 22px;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.narcotic-form__value--multiline {
+  min-height: 44px;
+  white-space: pre-wrap;
+}
+
+.narcotic-form__underline {
+  border-bottom: 1px dashed #cbd5e1;
+  padding: 0 6px;
+  min-width: 40px;
+  display: inline-block;
+  text-align: center;
+  font-weight: 600;
+}
+/* ============================================================
+   CallCardScreen — визуально выраженная вложенность
+   ============================================================ */
+
+.call-card {
+  min-height: 100dvh;
+  background: #eef2f6;
+  color: #13263c;
+}
+
+/* --- Header --- */
+.call-card__header {
+  color: #fff;
+}
+
+.call-card__header-inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 2rem;
+}
+
+@media (min-width: 640px) {
+  .call-card__header-inner {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+.call-card__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.call-card__back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  transition:
+    background 0.15s,
+    transform 0.1s;
+}
+
+.call-card__back:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.call-card__back:active {
+  transform: scale(0.95);
+}
+
+.call-card__brand {
+  text-align: center;
+}
+
+.call-card__brand-top {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.call-card__brand-bottom {
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.call-card__doc-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.call-card__title {
+  margin: 2rem 0 0;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.call-card__subtitle {
+  margin: 0.375rem 0 0;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.call-card__search {
+  margin-top: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  height: 3.5rem;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0 1rem;
+  color: #13263c;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.16);
+}
+
+.call-card__search-input {
+  min-width: 0;
+  flex: 1;
+  background: transparent;
+  border: 0;
+  font-size: 15px;
+  font-weight: 600;
+  outline: none;
+}
+
+.call-card__search-input::placeholder {
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.call-card__search-clear {
+  border: 0;
+  background: transparent;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: #94a3b8;
+}
+
+/* --- Body --- */
+.call-card__body {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .call-card__body {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* ============================================================
+   Секция списка (верхний уровень)
+   ============================================================ */
+.call-card__list-header {
+  margin-bottom: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.25rem;
+}
+
+.call-card__list-title {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.call-card__list-count {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.call-card__list-hint {
+  margin: 0 0 0.75rem;
+  padding: 0 0.25rem;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #94a3b8;
+}
+
+.call-card__list {
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow:
+    0 1px 0 rgba(20, 42, 65, 0.04),
+    0 8px 24px rgba(20, 42, 65, 0.08);
+  border: 1px solid #e2e8f0;
+}
+
+.call-card__list-loading {
+  padding: 1.5rem 1.25rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+/* --- Элемент поиска --- */
+.call-card__search-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.call-card__search-item:last-child {
+  border-bottom: 0;
+}
+
+.call-card__search-item:hover {
+  background: #f8fafc;
+}
+
+.call-card__search-item:active {
+  background: #f1f5f9;
+}
+
+.call-card__code {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  min-width: 3.5rem;
+  padding: 0 0.5rem;
+  border-radius: 0.5rem;
+  background: #e8eff5;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: #173653;
+}
+
+.call-card__search-name {
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #263a4e;
+}
+
+/* --- Пустой результат --- */
+.call-card__empty {
+  padding: 2.5rem 1.25rem;
+  text-align: center;
+}
+
+.call-card__empty-title {
+  margin: 0.75rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.call-card__empty-text {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+/* ============================================================
+   Дерево МКБ-10 — явная визуализация вложенности
+   ============================================================ */
+
+/* Корневой узел: без отступа, но с более плотной границей */
+.call-card__node {
+  position: relative;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.call-card__node:last-child {
+  border-bottom: 0;
+}
+
+/* Кнопка узла: слева резервируем место под направляющую линию */
+.call-card__node-btn {
+  position: relative;
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.call-card__node-btn:hover {
+  background: #f8fafc;
+}
+
+.call-card__node-btn:active {
+  background: #f1f5f9;
+}
+
+/* Направляющая вертикальная линия слева от кнопки.
+   Появляется только у вложенных узлов (глубина > 0),
+   т.к. глубина задаётся через style paddingLeft, а линия —
+   через ::before, позиционированный относительно paddingLeft. */
+.call-card__node-btn::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #dbe3ec;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Показываем линию, если есть отступ слева (вложенный уровень).
+   Значение 24px — порог, при котором начинается вложенность. */
+.call-card__node-btn[style*="padding-left"]::before {
+  /* fallback для браузеров без :has — можно убрать, если не нужно */
+}
+
+/* Современный способ: у любого узла, кроме корневого,
+   линия рисуется через вложенный контейнер */
+.call-card__node-children .call-card__node-btn::before {
+  opacity: 1;
+  left: calc(var(--depth, 0) * 16px + 8px);
+}
+
+/* Горизонтальная "ветка" к каждому вложенному элементу */
+.call-card__node-children .call-card__node-btn::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 1px;
+  background: #dbe3ec;
+  pointer-events: none;
+}
+
+.call-card__node-children .call-card__node-btn::after {
+  left: calc(var(--depth, 0) * 16px + 8px);
+}
+
+/* Вложенные уровни: отдельный фон и усиленная левая граница */
+.call-card__node-children {
+  background: #f7fafc;
+  border-left: 2px solid #dbe3ec;
+  margin-left: 1rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+/* Ещё глубже — ещё светлее фон, чтобы подчеркнуть уровень */
+.call-card__node-children .call-card__node-children {
+  background: #f2f6fa;
+  border-left-color: #cbd5e1;
+}
+
+.call-card__node-children .call-card__node-children .call-card__node-children {
+  background: #eef3f8;
+  border-left-color: #b8c4d4;
+}
+
+/* Код узла */
+.call-card__node-code {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  min-width: 3.5rem;
+  padding: 0 0.5rem;
+  border-radius: 0.5rem;
+  background: #e8eff5;
+  font-size: 13px;
+  font-weight: 800;
+  color: #173653;
+  flex-shrink: 0;
+}
+
+/* Название узла */
+.call-card__node-name {
+  min-width: 0;
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #263a4e;
+}
+
+/* Загрузка узла */
+.call-card__node-loading {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+/* Стрелка раскрытия */
+.call-card__node-arrow {
+  flex-shrink: 0;
+  color: #94a3b8;
+  transition: transform 0.15s;
+  font-size: 0.75rem;
+}
+
+.call-card__node-arrow--expanded {
+  transform: rotate(90deg);
+}
+
+/* ============================================================
+   Карточка диагноза
+   ============================================================ */
+.call-card__card {
+  overflow: hidden;
+  border-radius: 1rem;
+  background: #fff;
+  box-shadow:
+    0 1px 0 rgba(20, 42, 65, 0.04),
+    0 10px 32px rgba(20, 42, 65, 0.1);
+  border: 1px solid #e2e8f0;
+}
+
+.call-card__card-head {
+  padding: 1.25rem;
+  border-bottom: 1px solid #eef2f6;
+  background: linear-gradient(180deg, #fbfdff 0%, #ffffff 100%);
+}
+
+.call-card__card-head-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.call-card__card-code {
+  border-radius: 0.5rem;
+  background: #173653;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.call-card__card-status {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #059669;
+}
+
+.call-card__card-title {
+  margin: 0.25rem 0 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.call-card__card-change {
+  margin-top: 1rem;
+  border: 0;
+  background: transparent;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #356181;
+  padding: 0;
+}
+
+.call-card__card-change:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================
+   Секции карточки — каждый блок визуально отделён и вложен
+   ============================================================ */
+
+/* Общая секция (общие поля — без верхней границы) */
+.call-card__section {
+  padding: 1.25rem;
+  padding-bottom: 0.5rem;
+}
+
+/* Блок-секция (лекарства/тактика/рецепты) — отделена жирной линией */
+.call-card__section--block {
+  padding: 1.25rem;
+  border-top: 7px solid #eef2f6;
+  background: #ffffff;
+}
+
+/* Заголовок секции: иконка + текст */
+.call-card__section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.call-card__section-head--compact {
+  margin-bottom: 0.75rem;
+}
+
+/* Иконка секции — цветовой маркер уровня */
+.call-card__section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: #e8eff5;
+  color: #24415e;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(23, 54, 83, 0.06);
+}
+
+.call-card__section-icon--blue {
+  background: #eff6ff;
+  color: #2563eb;
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+}
+
+.call-card__section-icon--amber {
+  background: #fffbeb;
+  color: #d97706;
+  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.12);
+}
+
+.call-card__section-icon--emerald {
+  background: #ecfdf5;
+  color: #059669;
+  box-shadow: inset 0 0 0 1px rgba(5, 150, 105, 0.12);
+}
+
+.call-card__section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.call-card__section-sub {
+  margin: 0.125rem 0 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+/* Внутри секции — отступ слева, чтобы контент визуально "принадлежал" заголовку */
+.call-card__section--block > .medications-list,
+.call-card__section--block > .tactics-list,
+.call-card__section--block > .call-card__recipe-list {
+  padding-left: 0.25rem;
+}
+
+/* --- Служебные тексты --- */
+.call-card__loading {
+  padding: 1.5rem 0.25rem;
+  font-size: 0.875rem;
+  color: #94a3b8;
+}
+
+.call-card__notice {
+  margin-top: 1rem;
+  padding: 0.75rem 0.875rem;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #64748b;
+  background: #f8fafc;
+  border-left: 3px solid #cbd5e1;
+  border-radius: 0 6px 6px 0;
+}
+
+.call-card__recipe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.call-card__empty-text-plain {
+  font-size: 13px;
+  color: #94a3b8;
+}
+.editable-field {
+  margin-bottom: 12px;
+}
+
+.editable-field__label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #444;
+  margin-bottom: 4px;
+}
+
+.editable-field__textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #13263c;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.editable-field__textarea:focus {
+  border-color: #356181;
+  box-shadow: 0 0 0 3px rgba(53, 97, 129, 0.1);
+}
+
+.editable-field__textarea:disabled {
+  background: #f8fafc;
+  color: #64748b;
+  cursor: not-allowed;
+}
+.call-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.call-card__btn-edit {
+  font-size: 12px;
+  font-weight: 700;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 6px 12px;
+  transition: background 0.15s;
+}
+
+.call-card__btn-edit:hover {
+  background: #d1fae5;
+}
+
+.call-card__btn-save {
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #059669;
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 14px;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
+}
+
+.call-card__btn-save:hover {
+  background: #047857;
+}
+
+.call-card__btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.call-card__btn-cancel {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  background: transparent;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 6px 12px;
+  transition: background 0.15s;
+}
+
+.call-card__btn-cancel:hover {
+  background: #f1f5f9;
+}
+
+.call-card__btn-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.call-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.call-card__node-open {
+  margin-right: 8px;
+  padding: 4px 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #356181;
+  transition: background 0.15s;
+}
+
+.call-card__node-open:hover {
+  background: #f8fafc;
+}

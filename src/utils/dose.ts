@@ -1,9 +1,6 @@
+// src/utils/dose.ts
 export type DoseMode = "adult" | "child";
 
-/**
- * Тестовая формула: итог = базовая_доза × вес.
- * Позже заменим на клиническую (мг/кг × вес с capping).
- */
 export function calcDose(
   baseDose: number | null,
   weightKg: number,

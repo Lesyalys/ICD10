@@ -1,78 +1,43 @@
+// src/components/DoseCalculator.tsx
 import { useState } from "react";
 import { calcDose, parseWeight, type DoseMode } from "../utils/dose.ts";
 
 type Props = {
-  /** Доза для взрослого (DOSE_A) */
   doseA: number | null;
-  /** Доза для ребёнка (DOSE_C) */
   doseC: number | null;
-  /** Колбэк — сообщает родителю выбранный режим, вес и расчёт */
-  onChange?: (state: {
-    mode: DoseMode;
-    weightKg: number;
-    result: number | null;
-  }) => void;
-  /** Внешний режим (опционально — если родитель хочет синхронизировать) */
-  mode?: DoseMode;
-  /** Внешний вес (опционально) */
-  weight?: string;
-  /** Компактный вид без подписи формулы */
   compact?: boolean;
 };
 
 export default function DoseCalculator({
   doseA,
   doseC,
-  onChange,
-  mode: externalMode,
-  weight: externalWeight,
   compact = false,
 }: Props) {
-  const [internalMode, setInternalMode] = useState<DoseMode>("adult");
-  const [internalWeight, setInternalWeight] = useState("");
-
-  const mode = externalMode ?? internalMode;
-  const weight = externalWeight ?? internalWeight;
+  const [mode, setMode] = useState<DoseMode>("adult");
+  const [weight, setWeight] = useState("");
 
   const weightKg = parseWeight(weight);
   const baseDose = mode === "adult" ? doseA : doseC;
   const result = calcDose(baseDose, weightKg);
 
-  function updateMode(next: DoseMode) {
-    if (externalMode === undefined) setInternalMode(next);
-    onChange?.({
-      mode: next,
-      weightKg,
-      result: calcDose(next === "adult" ? doseA : doseC, weightKg),
-    });
-  }
-
-  function updateWeight(next: string) {
-    if (externalWeight === undefined) setInternalWeight(next);
-    const kg = parseWeight(next);
-    onChange?.({
-      mode,
-      weightKg: kg,
-      result: calcDose(baseDose, kg),
-    });
-  }
-
   return (
-    <div className="dose-calc">
-      <div className="dose-calc__controls">
-        <div className="dose-calc__toggle">
+    <div className="rounded-lg border border-dashed border-[#c7d2fe] bg-[#eef2ff] px-3 py-2">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
           {(
             [
               ["adult", "Взрослый"],
               ["child", "Ребёнок"],
             ] as const
-          ).map(([value, label]) => (
+          ).map(([v, label]) => (
             <button
-              key={value}
+              key={v}
               type="button"
-              onClick={() => updateMode(value)}
-              className={`dose-calc__toggle-btn${
-                mode === value ? " dose-calc__toggle-btn--active" : ""
+              onClick={() => setMode(v)}
+              className={`rounded-md px-3 py-1.5 text-[12px] font-bold transition ${
+                mode === v
+                  ? "bg-[#173653] text-white"
+                  : "text-slate-500 hover:text-[#173653]"
               }`}
             >
               {label}
@@ -80,44 +45,48 @@ export default function DoseCalculator({
           ))}
         </div>
 
-        <label className="dose-calc__weight">
-          <span className="dose-calc__weight-label">Вес</span>
+        <label className="flex items-center gap-2">
+          <span className="text-[12px] font-semibold text-slate-600">Вес</span>
           <input
             type="number"
             inputMode="decimal"
             min={0}
             step="0.1"
             value={weight}
-            onChange={(e) => updateWeight(e.target.value)}
+            onChange={(e) => setWeight(e.target.value)}
             placeholder="кг"
-            className="dose-calc__weight-input"
+            className="w-20 rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px] font-semibold text-[#13263c] outline-none focus:border-[#356181]"
           />
-          <span className="dose-calc__weight-unit">кг</span>
+          <span className="text-[12px] text-slate-400">кг</span>
         </label>
       </div>
 
-      <div className="dose-calc__result">
+      <div className="mt-2">
         {weightKg <= 0 ? (
-          <p className="dose-calc__hint">Введите вес, чтобы рассчитать дозу</p>
+          <p className="text-[11.5px] text-slate-500">
+            Введите вес, чтобы рассчитать дозу
+          </p>
         ) : baseDose == null ? (
-          <p className="dose-calc__hint">
+          <p className="text-[11.5px] text-slate-500">
             Для режима «{mode === "adult" ? "Взрослый" : "Ребёнок"}» доза не
             задана
           </p>
         ) : (
-          <div className="dose-calc__formula">
-            <span className="dose-calc__formula-part">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-[11.5px] text-slate-500">
               {mode === "adult" ? "Взрослый" : "Ребёнок"}:{" "}
               <strong>{baseDose}</strong> × {weightKg} кг =
             </span>
-            <span className="dose-calc__value">{result}</span>
-            <span className="dose-calc__unit">(расчётная доза)</span>
+            <span className="text-[15px] font-extrabold text-[#173653]">
+              {result}
+            </span>
+            <span className="text-[11px] text-slate-400">(расчётная доза)</span>
           </div>
         )}
       </div>
 
       {!compact && (
-        <p className="dose-calc__note">
+        <p className="mt-1 text-[11px] text-slate-400">
           Расчёт по весу: доза препарата × вес. Тестовая формула.
         </p>
       )}

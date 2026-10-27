@@ -1,31 +1,24 @@
+// src/components/NarcoticForm.tsx
 import { useMemo } from "react";
 
 type Props = {
-  /** Строка рецепта из ATX_AMBULANCE.RECIPE */
   recipe?: string | null;
-  /** Код МКБ-10 выбранного диагноза */
   mkbCode?: string | null;
-  /** Название МКБ-10 выбранного диагноза */
   mkbName?: string | null;
-  /** Опциональные поля — по умолчанию прочерки */
   brigadeNumber?: string;
   cardNumber?: string;
   date?: string;
   patientName?: string;
   patientAge?: string;
   doctorName?: string;
-  /** «Получил» — количество прописью. Если null — прочерк. */
   amountWords?: string | null;
-  /** Подпись врача */
   doctorSignature?: string;
 };
 
 const DASH = "—";
 
-/** Пытаемся вытащить «количество» из начала строки рецепта, если оно есть */
 function parseAmountFromRecipe(recipe: string | null | undefined): string {
   if (!recipe) return DASH;
-  // Примеры: "Tab. 300 mg №1", "Sol. 1% 1,0 ml — 3 амп."
   const m =
     recipe.match(/№\s*(\d+)/i) || recipe.match(/(\d+)\s*(?:амп|таб|шт)/i);
   return m?.[1] ?? DASH;
