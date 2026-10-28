@@ -15,11 +15,7 @@ export default function CallCardRecipesSection({
   mkbCode,
   mkbName,
 }: Props) {
-  const rows = medications.flatMap((m) =>
-    m.tactics
-      .filter((t) => t.recipe && t.recipe.trim())
-      .map((t) => ({ med: m, tactic: t })),
-  );
+  const rows = medications.filter((m) => m.recipe && m.recipe.trim());
 
   return (
     <section className="call-card__section--block">
@@ -39,10 +35,10 @@ export default function CallCardRecipesSection({
         <p className="call-card__empty-text-plain">{EMPTY}</p>
       ) : (
         <div className="call-card__recipe-list">
-          {rows.map(({ med, tactic }) => (
+          {rows.map((med) => (
             <NarcoticForm
-              key={`${med.id}-${tactic.id}`}
-              recipe={tactic.recipe}
+              key={med.id}
+              recipe={med.recipe}
               mkbCode={mkbCode}
               mkbName={mkbName}
             />

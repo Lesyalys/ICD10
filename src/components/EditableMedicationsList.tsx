@@ -1,7 +1,12 @@
 // src/components/EditableMedicationsList.tsx
 import { useEffect, useState } from "react";
 import type { AtxNode } from "../DB/queries.ts";
-import type { MedicationView } from "../utils/normalize.ts";
+import type { MedicationView, MedicationTactic } from "../utils/normalize.ts";
+import RoutesSelect from "./RoutesSelect.tsx";
+
+/* ============================================================
+   ТИПЫ
+   ============================================================ */
 
 export type TacticDraft = {
   text: string;
@@ -9,9 +14,13 @@ export type TacticDraft = {
   condition: string;
   doseA: string;
   doseC: string;
-  recipe: string;
   next: string;
   priority: string;
+};
+
+export type NewTacticDraft = TacticDraft & {
+  tempId: string;
+  existingId: number | null;
 };
 
 export type NewMedDraft = {
@@ -20,14 +29,14 @@ export type NewMedDraft = {
   name: string;
   unit: string;
   content: string;
-  /** Одна тактика для нового препарата */
+  /** Рецепт хранится на препарате (ATX_AMBULANCE.RECIPE), не на тактике */
+  recipe: string;
   tactic: TacticDraft;
 };
 
 export type MedDrafts = Record<
   number,
   {
-    /** правки существующих тактик по tactikId */
     tactics: Record<number, TacticDraft>;
   }
 >;
@@ -35,6 +44,7 @@ export type MedDrafts = Record<
 export type DraftsState = {
   drafts: MedDrafts;
   newMeds: NewMedDraft[];
+  newTactics: Record<number, NewTacticDraft[]>;
   deletedMeds: number[];
   deletedTactics: Array<{ medId: number; tactikId: number }>;
 };
@@ -42,9 +52,14 @@ export type DraftsState = {
 export const emptyDraftsState: DraftsState = {
   drafts: {},
   newMeds: [],
+  newTactics: {},
   deletedMeds: [],
   deletedTactics: [],
 };
+
+/* ============================================================
+   ХЕЛПЕРЫ
+   ============================================================ */
 
 function emptyTacticDraft(): TacticDraft {
   return {
@@ -53,48 +68,26 @@ function emptyTacticDraft(): TacticDraft {
     condition: "",
     doseA: "",
     doseC: "",
-    recipe: "",
     next: "",
     priority: "",
   };
 }
 
-function tacticFromView(m: MedicationView, tId: number): TacticDraft {
-  const t = m.tactics.find((x) => x.id === tId);
-  if (!t) return emptyTacticDraft();
+function tacticToDraft(t: MedicationTactic): TacticDraft {
   return {
     text: t.text ?? "",
     routes: t.routes ?? "",
     condition: t.condition ?? "",
     doseA: t.doseA != null ? String(t.doseA) : "",
     doseC: t.doseC != null ? String(t.doseC) : "",
-    recipe: t.recipe ?? "",
     next: t.next ?? "",
     priority: t.priority ?? "",
   };
 }
 
-function newMedFromExisting(med: AtxNode): NewMedDraft {
-  return {
-    tempId: `picked-${med.ID}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    existingId: med.ID,
-    name: med.NAME ?? "",
-    unit: med.UNIT ?? "",
-    content: med.CONTENT ?? "",
-    tactic: emptyTacticDraft(),
-  };
-}
-
-function newMedEmpty(): NewMedDraft {
-  return {
-    tempId: `new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    existingId: null,
-    name: "",
-    unit: "",
-    content: "",
-    tactic: emptyTacticDraft(),
-  };
-}
+/* ============================================================
+   ПРОПСЫ
+   ============================================================ */
 
 type Props = {
   items: MedicationView[];
@@ -103,8 +96,19 @@ type Props = {
   pickedMed: AtxNode | null;
   createBlank: boolean;
   onConsumeExternal: () => void;
+  onEditMedication: (med: {
+    id: number;
+    name: string | null;
+    unit: string | null;
+    content: string | null;
+    recipe: string | null;
+  }) => void;
   onChange: (state: DraftsState) => void;
 };
+
+/* ============================================================
+   КОМПОНЕНТ
+   ============================================================ */
 
 export default function EditableMedicationsList({
   items,
@@ -113,32 +117,32 @@ export default function EditableMedicationsList({
   pickedMed,
   createBlank,
   onConsumeExternal,
+  onEditMedication,
   onChange,
 }: Props) {
   const [state, setState] = useState<DraftsState>(emptyDraftsState);
-  const [newTacticFor, setNewTacticFor] = useState<Record<number, TacticDraft>>(
-    {},
-  );
 
+  // Инициализация черновиков при смене items
   useEffect(() => {
-    const initialDrafts: MedDrafts = {};
+    const initial: MedDrafts = {};
     for (const m of items) {
-      const t: Record<number, TacticDraft> = {};
-      for (const x of m.tactics) t[x.id] = tacticFromView(m, x.id);
-      initialDrafts[m.id] = { tactics: t };
+      const tactics: Record<number, TacticDraft> = {};
+      for (const t of m.tactics) tactics[t.id] = tacticToDraft(t);
+      initial[m.id] = { tactics };
     }
     const next: DraftsState = {
-      drafts: initialDrafts,
+      drafts: initial,
       newMeds: [],
+      newTactics: {},
       deletedMeds: [],
       deletedTactics: [],
     };
     setState(next);
-    setNewTacticFor({});
     onChange(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
+  // pickedMed → добавить новый препарат (с одной пустой тактикой)
   useEffect(() => {
     if (!pickedMed) return;
     if (pickedMed.LEVEL !== 2) {
@@ -149,20 +153,43 @@ export default function EditableMedicationsList({
       onConsumeExternal();
       return;
     }
-    const next = {
+    const next: DraftsState = {
       ...state,
-      newMeds: [...state.newMeds, newMedFromExisting(pickedMed)],
+      newMeds: [
+        ...state.newMeds,
+        {
+          tempId: `p-${pickedMed.ID}-${Date.now()}`,
+          existingId: pickedMed.ID,
+          name: pickedMed.NAME ?? "",
+          unit: pickedMed.UNIT ?? "",
+          content: pickedMed.CONTENT ?? "",
+          recipe: "",
+          tactic: emptyTacticDraft(),
+        },
+      ],
     };
     emit(next);
     onConsumeExternal();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickedMed]);
 
+  // createBlank → создать новый препарат с нуля
   useEffect(() => {
     if (!createBlank) return;
-    const next = {
+    const next: DraftsState = {
       ...state,
-      newMeds: [...state.newMeds, newMedEmpty()],
+      newMeds: [
+        ...state.newMeds,
+        {
+          tempId: `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          existingId: null,
+          name: "",
+          unit: "",
+          content: "",
+          recipe: "",
+          tactic: emptyTacticDraft(),
+        },
+      ],
     };
     emit(next);
     onConsumeExternal();
@@ -181,7 +208,7 @@ export default function EditableMedicationsList({
   ) {
     const med = state.drafts[medId] ?? { tactics: {} };
     const base = med.tactics[tactikId] ?? emptyTacticDraft();
-    const next: DraftsState = {
+    emit({
       ...state,
       drafts: {
         ...state.drafts,
@@ -189,8 +216,50 @@ export default function EditableMedicationsList({
           tactics: { ...med.tactics, [tactikId]: { ...base, ...patch } },
         },
       },
+    });
+  }
+
+  function addNewTactic(medId: number) {
+    const t: NewTacticDraft = {
+      ...emptyTacticDraft(),
+      tempId: `t-${medId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      existingId: null,
     };
-    emit(next);
+    emit({
+      ...state,
+      newTactics: {
+        ...state.newTactics,
+        [medId]: [...(state.newTactics[medId] ?? []), t],
+      },
+    });
+  }
+
+  function updateNewTactic(
+    medId: number,
+    tempId: string,
+    patch: Partial<NewTacticDraft>,
+  ) {
+    emit({
+      ...state,
+      newTactics: {
+        ...state.newTactics,
+        [medId]: (state.newTactics[medId] ?? []).map((t) =>
+          t.tempId === tempId ? { ...t, ...patch } : t,
+        ),
+      },
+    });
+  }
+
+  function removeNewTactic(medId: number, tempId: string) {
+    emit({
+      ...state,
+      newTactics: {
+        ...state.newTactics,
+        [medId]: (state.newTactics[medId] ?? []).filter(
+          (t) => t.tempId !== tempId,
+        ),
+      },
+    });
   }
 
   function toggleDeleteTactic(medId: number, tactikId: number) {
@@ -213,64 +282,34 @@ export default function EditableMedicationsList({
     emit({ ...state, deletedMeds });
   }
 
-  function updateNewTacticFor(medId: number, patch: Partial<TacticDraft>) {
-    const base = newTacticFor[medId] ?? emptyTacticDraft();
-    setNewTacticFor({ ...newTacticFor, [medId]: { ...base, ...patch } });
-  }
-
-  function addNewTactic(medId: number) {
-    const t = newTacticFor[medId];
-    if (!t) return;
-    if (!t.text.trim() && !t.routes.trim()) {
-      // пустую не добавляем
-      return;
-    }
-    // добавляем как «новую тактику к существующему препарату»
-    const next: DraftsState = {
-      ...state,
-      newMeds: [
-        ...state.newMeds,
-        {
-          tempId: `add-${medId}-${Date.now()}`,
-          existingId: medId,
-          name: "",
-          unit: "",
-          content: "",
-          tactic: t,
-        },
-      ],
-    };
-    emit(next);
-    setNewTacticFor({ ...newTacticFor, [medId]: emptyTacticDraft() });
-  }
-
   function updateNewMed(tempId: string, patch: Partial<NewMedDraft>) {
-    const next: DraftsState = {
+    emit({
       ...state,
       newMeds: state.newMeds.map((n) =>
         n.tempId === tempId ? { ...n, ...patch } : n,
       ),
-    };
-    emit(next);
+    });
   }
 
   function updateNewMedTactic(tempId: string, patch: Partial<TacticDraft>) {
-    const next: DraftsState = {
+    emit({
       ...state,
       newMeds: state.newMeds.map((n) =>
         n.tempId === tempId ? { ...n, tactic: { ...n.tactic, ...patch } } : n,
       ),
-    };
-    emit(next);
+    });
   }
 
   function removeNewMed(tempId: string) {
-    const next: DraftsState = {
+    emit({
       ...state,
       newMeds: state.newMeds.filter((n) => n.tempId !== tempId),
-    };
-    emit(next);
+    });
   }
+
+  /* ============================================================
+     РЕНДЕР
+     ============================================================ */
 
   return (
     <div className="space-y-2.5">
@@ -278,7 +317,6 @@ export default function EditableMedicationsList({
       {items.map((m) => {
         const isDeleted = state.deletedMeds.includes(m.id);
         const medDraft = state.drafts[m.id] ?? { tactics: {} };
-        const newTactic = newTacticFor[m.id] ?? emptyTacticDraft();
 
         return (
           <div
@@ -301,31 +339,53 @@ export default function EditableMedicationsList({
                   <span className="text-[11px] text-slate-500">{m.unit}</span>
                 )}
                 {isEditing && (
-                  <button
-                    className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
-                      isDeleted
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-red-50 text-red-600"
-                    }`}
-                    onClick={() => toggleDeleteMed(m.id)}
-                    type="button"
-                  >
-                    {isDeleted ? "Восстановить препарат" : "Удалить препарат"}
-                  </button>
+                  <>
+                    <button
+                      className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100"
+                      onClick={() =>
+                        onEditMedication({
+                          id: m.id,
+                          name: m.name,
+                          unit: m.unit,
+                          content: m.content,
+                          recipe: m.recipe,
+                        })
+                      }
+                      type="button"
+                    >
+                      Редактировать
+                    </button>
+                    <button
+                      className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
+                        isDeleted
+                          ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                          : "bg-red-50 text-red-600 hover:bg-red-100"
+                      }`}
+                      onClick={() => toggleDeleteMed(m.id)}
+                      type="button"
+                    >
+                      {isDeleted ? "Восстановить" : "Удалить"}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
 
+            {m.recipe && (
+              <p className="mt-1 whitespace-pre-wrap font-serif text-[12px] italic text-slate-600">
+                {m.recipe}
+              </p>
+            )}
+
             {!isDeleted && (
               <>
-                {/* Тактики препарата */}
+                {/* Существующие тактики */}
                 <div className="mt-2 space-y-2">
                   {m.tactics.map((t) => {
                     const tDeleted = state.deletedTactics.some(
                       (x) => x.medId === m.id && x.tactikId === t.id,
                     );
-                    const tDraft =
-                      medDraft.tactics[t.id] ?? tacticFromView(m, t.id);
+                    const tDraft = medDraft.tactics[t.id] ?? tacticToDraft(t);
 
                     return (
                       <div
@@ -356,7 +416,7 @@ export default function EditableMedicationsList({
                         </div>
 
                         {isEditing && !tDeleted ? (
-                          <div className="mt-2 space-y-1.5">
+                          <div className="mt-2 space-y-2">
                             <textarea
                               rows={2}
                               value={tDraft.text}
@@ -368,16 +428,11 @@ export default function EditableMedicationsList({
                               placeholder="Тактика"
                               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
                             />
-                            <input
-                              type="text"
+                            <RoutesSelect
                               value={tDraft.routes}
-                              onChange={(e) =>
-                                updateTactic(m.id, t.id, {
-                                  routes: e.target.value,
-                                })
+                              onChange={(v) =>
+                                updateTactic(m.id, t.id, { routes: v })
                               }
-                              placeholder="Пути введения"
-                              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
                             />
                             <input
                               type="text"
@@ -390,7 +445,7 @@ export default function EditableMedicationsList({
                               placeholder="Условие"
                               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
                             />
-                            <div className="grid grid-cols-2 gap-1.5">
+                            <div className="grid grid-cols-2 gap-2">
                               <input
                                 type="number"
                                 step="0.01"
@@ -416,17 +471,6 @@ export default function EditableMedicationsList({
                                 className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
                               />
                             </div>
-                            <textarea
-                              rows={2}
-                              value={tDraft.recipe}
-                              onChange={(e) =>
-                                updateTactic(m.id, t.id, {
-                                  recipe: e.target.value,
-                                })
-                              }
-                              placeholder="Рецепт"
-                              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 font-serif italic text-[13px]"
-                            />
                           </div>
                         ) : (
                           <div className="mt-1 text-[12px] text-slate-600">
@@ -451,9 +495,6 @@ export default function EditableMedicationsList({
                                 {t.doseC != null && <>реб. {t.doseC}</>}
                               </p>
                             )}
-                            {t.recipe && (
-                              <p className="font-serif italic">{t.recipe}</p>
-                            )}
                           </div>
                         )}
                       </div>
@@ -461,69 +502,80 @@ export default function EditableMedicationsList({
                   })}
                 </div>
 
-                {/* Новая тактика к существующему препарату */}
-                {isEditing && (
-                  <div className="mt-3 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/40 px-3 py-2">
-                    <p className="text-[11.5px] font-bold text-emerald-700">
-                      + Новая тактика для этого препарата
-                    </p>
-                    <textarea
-                      rows={2}
-                      value={newTactic.text}
-                      onChange={(e) =>
-                        updateNewTacticFor(m.id, { text: e.target.value })
-                      }
-                      placeholder="Тактика"
-                      className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-                    />
-                    <input
-                      type="text"
-                      value={newTactic.routes}
-                      onChange={(e) =>
-                        updateNewTacticFor(m.id, { routes: e.target.value })
-                      }
-                      placeholder="Пути введения"
-                      className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-                    />
-                    <div className="mt-1 grid grid-cols-2 gap-1.5">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={newTactic.doseA}
-                        onChange={(e) =>
-                          updateNewTacticFor(m.id, { doseA: e.target.value })
-                        }
-                        placeholder="Доза взр."
-                        className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-                      />
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={newTactic.doseC}
-                        onChange={(e) =>
-                          updateNewTacticFor(m.id, { doseC: e.target.value })
-                        }
-                        placeholder="Доза реб."
-                        className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-                      />
+                {/* Новые тактики для существующего препарата */}
+                {(state.newTactics[m.id] ?? []).map((nt) => (
+                  <div
+                    key={nt.tempId}
+                    className="mt-2 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/40 px-3 py-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11.5px] font-bold text-emerald-700">
+                        Новая тактика
+                      </p>
+                      <button
+                        className="rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-600"
+                        onClick={() => removeNewTactic(m.id, nt.tempId)}
+                        type="button"
+                      >
+                        Убрать
+                      </button>
                     </div>
-                    <textarea
-                      rows={2}
-                      value={newTactic.recipe}
-                      onChange={(e) =>
-                        updateNewTacticFor(m.id, { recipe: e.target.value })
-                      }
-                      placeholder="Рецепт"
-                      className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 font-serif italic text-[13px]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => addNewTactic(m.id)}
-                      className="mt-1.5 rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
-                    >
-                      Добавить тактику
-                    </button>
+                    <div className="mt-2 space-y-2">
+                      <textarea
+                        rows={2}
+                        value={nt.text}
+                        onChange={(e) =>
+                          updateNewTactic(m.id, nt.tempId, {
+                            text: e.target.value,
+                          })
+                        }
+                        placeholder="Тактика"
+                        className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
+                      />
+                      <RoutesSelect
+                        value={nt.routes}
+                        onChange={(v) =>
+                          updateNewTactic(m.id, nt.tempId, { routes: v })
+                        }
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={nt.doseA}
+                          onChange={(e) =>
+                            updateNewTactic(m.id, nt.tempId, {
+                              doseA: e.target.value,
+                            })
+                          }
+                          placeholder="Доза взр."
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
+                        />
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={nt.doseC}
+                          onChange={(e) =>
+                            updateNewTactic(m.id, nt.tempId, {
+                              doseC: e.target.value,
+                            })
+                          }
+                          placeholder="Доза реб."
+                          className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
+                        />
+                      </div>
+                    </div>
                   </div>
+                ))}
+
+                {isEditing && (
+                  <button
+                    type="button"
+                    className="mt-2 w-full rounded-lg border border-dashed border-emerald-400 bg-emerald-50 py-1.5 text-[11.5px] font-bold text-emerald-700 hover:bg-emerald-100"
+                    onClick={() => addNewTactic(m.id)}
+                  >
+                    + Добавить тактику
+                  </button>
                 )}
               </>
             )}
@@ -531,7 +583,7 @@ export default function EditableMedicationsList({
         );
       })}
 
-      {/* Черновики новых препаратов */}
+      {/* Новые препараты (черновики) */}
       {state.newMeds.map((n) => (
         <div
           key={n.tempId}
@@ -540,7 +592,7 @@ export default function EditableMedicationsList({
           <div className="flex items-center justify-between">
             <p className="text-[12px] font-bold text-emerald-700">
               {n.existingId
-                ? `Дополнительная тактика для препарата #${n.name}`
+                ? `Дополнительная тактика для препарата «${n.name || "—"}»`
                 : "Новый препарат"}
             </p>
             <button
@@ -579,7 +631,22 @@ export default function EditableMedicationsList({
             </div>
           )}
 
-          <div className="mt-2 space-y-1.5">
+          {!n.existingId && (
+            <label className="mt-2 block text-[11.5px] text-slate-500">
+              Рецепт (на препарате)
+              <textarea
+                rows={2}
+                value={n.recipe}
+                onChange={(e) =>
+                  updateNewMed(n.tempId, { recipe: e.target.value })
+                }
+                placeholder="Например: Sol. Morphini hydrochloridi 1% - 1 ml"
+                className="mt-1 w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 font-serif text-[13px] italic"
+              />
+            </label>
+          )}
+
+          <div className="mt-2 space-y-2">
             <p className="text-[11.5px] font-bold text-slate-500">Тактика</p>
             <textarea
               rows={2}
@@ -590,14 +657,9 @@ export default function EditableMedicationsList({
               placeholder="Тактика"
               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
             />
-            <input
-              type="text"
+            <RoutesSelect
               value={n.tactic.routes}
-              onChange={(e) =>
-                updateNewMedTactic(n.tempId, { routes: e.target.value })
-              }
-              placeholder="Пути введения"
-              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
+              onChange={(v) => updateNewMedTactic(n.tempId, { routes: v })}
             />
             <input
               type="text"
@@ -608,7 +670,7 @@ export default function EditableMedicationsList({
               placeholder="Условие"
               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
             />
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"
                 step="0.01"
@@ -630,24 +692,15 @@ export default function EditableMedicationsList({
                 className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
               />
             </div>
-            <textarea
-              rows={2}
-              value={n.tactic.recipe}
-              onChange={(e) =>
-                updateNewMedTactic(n.tempId, { recipe: e.target.value })
-              }
-              placeholder="Рецепт"
-              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 font-serif italic text-[13px]"
-            />
           </div>
         </div>
       ))}
 
       {isEditing && (
         <button
+          type="button"
           className="mt-1 w-full rounded-lg border border-dashed border-emerald-400 bg-emerald-50 py-2 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100"
           onClick={onRequestPicker}
-          type="button"
         >
           + Добавить препарат
         </button>

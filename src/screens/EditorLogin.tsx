@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "../DB/supabase.js";
+import { supabase } from "../DB/supabase.ts";
 
 type Props = {
   onSuccess: () => void;

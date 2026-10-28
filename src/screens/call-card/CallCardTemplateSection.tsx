@@ -6,7 +6,7 @@ import type { TemplateDraft } from "./types.ts";
 type Props = {
   isEditing: boolean;
   loading: boolean;
-  hasTemplate: boolean;
+  notice: string | null;
   fields: {
     complaints: string;
     anamnesis: string;
@@ -22,7 +22,7 @@ const EMPTY = "—";
 export default function CallCardTemplateSection({
   isEditing,
   loading,
-  hasTemplate,
+  notice,
   fields,
   draft,
   onDraftChange,
@@ -73,11 +73,7 @@ export default function CallCardTemplateSection({
           <MedicalField label="Локальный статус">
             {fields.localStatus || EMPTY}
           </MedicalField>
-          {!hasTemplate && (
-            <p className="call-card__notice">
-              Шаблон для данного диагноза не заполнен в базе.
-            </p>
-          )}
+          {notice && <p className="call-card__notice">{notice}</p>}
         </>
       )}
     </section>

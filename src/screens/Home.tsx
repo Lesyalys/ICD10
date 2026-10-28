@@ -1,12 +1,9 @@
+import { useNavigate } from "react-router-dom";
 import HomeSelectBtn from "../components/HomeSelectBtn";
 
-export default function MenuScreen({
-  onOpen,
-  onOpenConsultant,
-}: {
-  onOpen: () => void;
-  onOpenConsultant: () => void;
-}) {
+export default function MenuScreen() {
+  const navigate = useNavigate();
+
   return (
     <main className="menu-screen min-h-dvh text-white">
       <div className="menu-overlay" />
@@ -26,13 +23,19 @@ export default function MenuScreen({
             <HomeSelectBtn
               title="СМП"
               discription="Примеры карт скорой медицинской помощи"
-              onOpen={onOpen}
+              onOpen={() => navigate("/call")}
             />
 
-            <HomeSelectBtn
+            {/* <HomeSelectBtn
               title="Консультант"
               discription="Подбор карты по симптомам"
-              onOpen={onOpenConsultant}
+              onOpen={() => navigate("/consultant")}
+            /> */}
+
+            <HomeSelectBtn
+              title="Справочник кодов МКБ-10"
+              discription="Перечень кодов в базе СМП"
+              onOpen={() => navigate("/mkb")}
             />
           </div>
         </div>

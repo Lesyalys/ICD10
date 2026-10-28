@@ -1,15 +1,21 @@
 // src/screens/CallCardScreen.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "../DB/supabase.js";
+import { supabase } from "../DB/supabase.ts";
+import { useToast } from "../components/toast.ts";
 import EditorLogin from "./EditorLogin.tsx";
+import MedicationEditorModal from "../components/MedicationEditorModal.tsx";
 import {
   emptyDraftsState as emptyDraftMeds,
   type DraftsState,
 } from "../components/EditableMedicationsList.tsx";
 import {
-  fetchTemplateForIcd10,
+  fetchTemplateById,
+  fetchSmpByIcd10Id,
+  ensureSmpCard,
+  fetchSmpChildren,
+  searchSmpIcd10,
+  fetchSmpParentIdsWithChildren,
   fetchMedicationsForIcd10,
-  fetchParentIdsWithChildren,
   updateDiseaseTemplate,
   createMedicationForIcd10,
   linkExistingMedicationWithTactic,
@@ -17,7 +23,7 @@ import {
   unlinkTactic,
   unlinkMedicationFromIcd10,
 } from "../DB/queries.ts";
-import type { DiseaseTemplateFull, AtxNode } from "../DB/queries.ts";
+import type { DiseaseTemplateFull, AtxNode, SmpIcd10 } from "../DB/queries.ts";
 import { flattenMedications } from "../utils/normalize.ts";
 
 import CallCardHeader from "./call-card/CallCardHeader.tsx";
@@ -28,8 +34,6 @@ import CallCardMedicationsSection from "./call-card/CallCardMedicationsSection.t
 import CallCardTacticsSection from "./call-card/CallCardTacticsSection.tsx";
 import CallCardRecipesSection from "./call-card/CallCardRecipesSection.tsx";
 import type { Icd10Item, TemplateDraft } from "./call-card/types.ts";
-
-const ICD10_FIELDS = "ID, MKB_CODE, MKB_NAME, ID_PARENT, REC_CODE";
 
 const emptyTemplateDraft: TemplateDraft = {
   COMPLAINTS: "",
@@ -47,47 +51,6 @@ function templateToDraft(tpl: DiseaseTemplateFull | null): TemplateDraft {
   };
 }
 
-async function fetchChildren(parentId: number | null): Promise<Icd10Item[]> {
-  let builder = supabase
-    .from("ICD10")
-    .select(ICD10_FIELDS)
-    .eq("ACTUAL", 1)
-    .order("REC_CODE", { ascending: true })
-    .order("MKB_CODE", { ascending: true });
-
-  if (parentId === null) {
-    builder = builder.is("ID_PARENT", null);
-  } else {
-    builder = builder.eq("ID_PARENT", String(parentId));
-  }
-
-  const { data, error } = await builder;
-  if (error) {
-    console.error("fetchChildren error:", error);
-    return [];
-  }
-  return (data as Icd10Item[]) ?? [];
-}
-
-async function searchIcd10(query: string): Promise<Icd10Item[]> {
-  const q = query.trim().replace(/[%_]/g, "");
-  if (q.length < 2) return [];
-
-  const { data, error } = await supabase
-    .from("ICD10")
-    .select(ICD10_FIELDS)
-    .eq("ACTUAL", 1)
-    .or(`MKB_CODE.ilike.%${q}%,MKB_NAME.ilike.%${q}%`)
-    .order("MKB_CODE", { ascending: true })
-    .limit(50);
-
-  if (error) {
-    console.error("searchIcd10 error:", error);
-    return [];
-  }
-  return (data as Icd10Item[]) ?? [];
-}
-
 export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   const [query, setQuery] = useState("");
   const [nodes, setNodes] = useState<Record<string, Icd10Item[]>>({});
@@ -101,6 +64,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   const [searching, setSearching] = useState(false);
 
   const [selected, setSelected] = useState<Icd10Item | null>(null);
+  const [smp, setSmp] = useState<SmpIcd10 | null>(null);
   const [template, setTemplate] = useState<DiseaseTemplateFull | null>(null);
   const [medicationsRaw, setMedicationsRaw] = useState<
     Awaited<ReturnType<typeof fetchMedicationsForIcd10>> | []
@@ -119,8 +83,18 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   // ← ДОБАВЛЕНО: модалка логина
   const [editorLoginOpen, setEditorLoginOpen] = useState(false);
 
+  // Модалка редактирования карточки препарата (ATX_AMBULANCE)
+  const [editMed, setEditMed] = useState<{
+    id: number;
+    name: string | null;
+    unit: string | null;
+    content: string | null;
+    recipe: string | null;
+  } | null>(null);
+
   const reqIdRef = useRef(0);
   const searchMode = query.trim().length >= 2;
+  const { notify } = useToast();
 
   // --- Загрузка корней ICD10 ---
   useEffect(() => {
@@ -128,8 +102,8 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     (async () => {
       setLoadingNodes((s) => new Set(s).add("root"));
       const [roots, parents] = await Promise.all([
-        fetchChildren(null),
-        fetchParentIdsWithChildren(),
+        fetchSmpChildren(null),
+        fetchSmpParentIdsWithChildren(),
       ]);
       if (!alive) return;
       setNodes((n) => ({ ...n, root: roots }));
@@ -157,7 +131,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     const t = setTimeout(async () => {
       const myId = ++reqIdRef.current;
       setSearching(true);
-      const data = await searchIcd10(q);
+      const data = await searchSmpIcd10(q);
       if (myId !== reqIdRef.current) return;
       setSearchResults(data);
       setSearching(false);
@@ -172,12 +146,27 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
 
   // --- Клик «Режим редактирования»: проверяем сессию ---
   async function handleStartEditing() {
+    if (!selected) return;
+
     const { data } = await supabase.auth.getSession();
-    if (data.session) {
-      setIsEditing(true);
-    } else {
+    if (!data.session) {
       setEditorLoginOpen(true);
+      return;
     }
+
+    // Диагноз обязан существовать в SMP_ICD10 — создаём запись и шаблон при отсутствии
+    if (!smp || !template) {
+      const ensured = await ensureSmpCard(selected.ID);
+      if (!ensured) {
+        notify("Не удалось добавить диагноз в базу СМП", "error");
+        return;
+      }
+      setSmp(ensured.smp);
+      setTemplate(ensured.template);
+      setDraftTemplate(templateToDraft(ensured.template));
+    }
+
+    setIsEditing(true);
   }
 
   async function toggleNode(item: Icd10Item) {
@@ -196,7 +185,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     }
     if (!nodes[id]) {
       setLoadingNodes((s) => new Set(s).add(id));
-      const children = await fetchChildren(id);
+      const children = await fetchSmpChildren(id);
       setLoadingNodes((s) => {
         const n = new Set(s);
         n.delete(id);
@@ -216,6 +205,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
 
   async function loadTemplateFor(item: Icd10Item) {
     setSelected(item);
+    setSmp(null);
     setTemplate(null);
     setMedicationsRaw([]);
     setLoadingTemplate(true);
@@ -225,11 +215,18 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     setPickedMed(null);
     setCreateBlank(false);
     setPickerOpen(false);
+    setEditMed(null);
 
-    const [tpl, meds] = await Promise.all([
-      fetchTemplateForIcd10(item.ID),
+    const [smpRec, meds] = await Promise.all([
+      fetchSmpByIcd10Id(item.ID),
       fetchMedicationsForIcd10(item.ID),
     ]);
+    setSmp(smpRec);
+
+    let tpl: DiseaseTemplateFull | null = null;
+    if (smpRec?.DISEASE_TEMPLATES_ID) {
+      tpl = await fetchTemplateById(Number(smpRec.DISEASE_TEMPLATES_ID));
+    }
     setTemplate(tpl);
     setMedicationsRaw(meds);
     setDraftTemplate(templateToDraft(tpl));
@@ -249,9 +246,17 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     setIsEditing(false);
   }
 
+  // Перечитать препараты после сохранения карточки из модалки
+  async function reloadMedications() {
+    if (!selected) return;
+    const meds = await fetchMedicationsForIcd10(selected.ID);
+    setMedicationsRaw(meds);
+  }
+
   function handleQueryChange(v: string) {
     setQuery(v);
     setSelected(null);
+    setSmp(null);
     setTemplate(null);
     setMedicationsRaw([]);
     setIsEditing(false);
@@ -261,6 +266,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   }
   function handleChangeDiagnosis() {
     setSelected(null);
+    setSmp(null);
     setTemplate(null);
     setMedicationsRaw([]);
     setIsEditing(false);
@@ -288,24 +294,34 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     if (!selected) return;
     setSaving(true);
     try {
-      // 1) Шаблон
-      if (template) {
+      // 1) Диагноз в SMP_ICD10 + шаблон (обеспечиваем наличие)
+      let tpl = template;
+      if (!smp || !tpl) {
+        const ensured = await ensureSmpCard(selected.ID);
+        if (!ensured) throw new Error("Не удалось добавить диагноз в базу СМП");
+        setSmp(ensured.smp);
+        tpl = ensured.template;
+        setTemplate(tpl);
+      }
+
+      // Шаблон
+      if (tpl) {
         const patch: Partial<
           Pick<
             DiseaseTemplateFull,
             "COMPLAINTS" | "ANAMNESIS" | "OBJECTIVELY" | "LOCAL_STATUS"
           >
         > = {};
-        if (draftTemplate.COMPLAINTS !== (template.COMPLAINTS ?? ""))
+        if (draftTemplate.COMPLAINTS !== (tpl.COMPLAINTS ?? ""))
           patch.COMPLAINTS = draftTemplate.COMPLAINTS;
-        if (draftTemplate.ANAMNESIS !== (template.ANAMNESIS ?? ""))
+        if (draftTemplate.ANAMNESIS !== (tpl.ANAMNESIS ?? ""))
           patch.ANAMNESIS = draftTemplate.ANAMNESIS;
-        if (draftTemplate.OBJECTIVELY !== (template.OBJECTIVELY ?? ""))
+        if (draftTemplate.OBJECTIVELY !== (tpl.OBJECTIVELY ?? ""))
           patch.OBJECTIVELY = draftTemplate.OBJECTIVELY;
-        if (draftTemplate.LOCAL_STATUS !== (template.LOCAL_STATUS ?? ""))
+        if (draftTemplate.LOCAL_STATUS !== (tpl.LOCAL_STATUS ?? ""))
           patch.LOCAL_STATUS = draftTemplate.LOCAL_STATUS;
         if (Object.keys(patch).length > 0) {
-          const ok = await updateDiseaseTemplate(template.ID, patch);
+          const ok = await updateDiseaseTemplate(tpl.ID, patch);
           if (!ok) throw new Error("Не удалось сохранить шаблон");
         }
       }
@@ -363,7 +379,6 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
             patch.CONDITION = d.condition || null;
           if (doseA !== t.doseA) patch.DOSE_A = doseA;
           if (doseC !== t.doseC) patch.DOSE_C = doseC;
-          if (d.recipe !== (t.recipe ?? "")) patch.RECIPE = d.recipe || null;
           if (d.next !== (t.next ?? "")) patch.NEXT_TACTIK = d.next || null;
           if (d.priority !== (t.priority ?? ""))
             patch.PRIORITY = d.priority || null;
@@ -391,7 +406,6 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
               CONDITION: t.condition || null,
               DOSE_A: doseA,
               DOSE_C: doseC,
-              RECIPE: t.recipe || null,
               NEXT_TACTIK: t.next || null,
               PRIORITY: t.priority || null,
             },
@@ -407,12 +421,12 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
             NAME: n.name.trim(),
             UNIT: n.unit.trim() || null,
             CONTENT: n.content.trim() || null,
+            RECIPE: n.recipe.trim() || null,
             TACTIK_TEXT: t.text || null,
             ROUTES: t.routes || null,
             CONDITION: t.condition || null,
             DOSE_A: doseA,
             DOSE_C: doseC,
-            RECIPE: t.recipe || null,
             NEXT_TACTIK: t.next || null,
             PRIORITY: t.priority || null,
           });
@@ -423,20 +437,25 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
       }
 
       // 6) Перечитать
-      const [tpl, meds] = await Promise.all([
-        fetchTemplateForIcd10(selected.ID),
+      const [smpRec, meds] = await Promise.all([
+        fetchSmpByIcd10Id(selected.ID),
         fetchMedicationsForIcd10(selected.ID),
       ]);
-      setTemplate(tpl);
+      setSmp(smpRec);
+
+      const reloadedTpl = smpRec?.DISEASE_TEMPLATES_ID
+        ? await fetchTemplateById(Number(smpRec.DISEASE_TEMPLATES_ID))
+        : null;
+      setTemplate(reloadedTpl);
       setMedicationsRaw(meds);
-      setDraftTemplate(templateToDraft(tpl));
+      setDraftTemplate(templateToDraft(reloadedTpl));
       setDraftMeds(emptyDraftMeds);
       setPickedMed(null);
       setCreateBlank(false);
       setIsEditing(false);
     } catch (err) {
       console.error("save error:", err);
-      alert("Ошибка сохранения. Подробности в консоли.");
+      notify("Ошибка сохранения. Подробности в консоли.", "error");
     } finally {
       setSaving(false);
     }
@@ -452,15 +471,42 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     [template],
   );
 
+  // Пояснение под общими полями: статуса диагноза в SMP_ICD10
+  const templateNotice = useMemo(() => {
+    if (!smp)
+      return "Диагноз ещё не в базе СМП. «Режим редактирования» добавит его.";
+    if (!smp.is_active) return "Диагноз отключён в базе СМП.";
+    if (!template) return "Шаблон для данного диагноза не заполнен в базе.";
+    return null;
+  }, [smp, template]);
+
   return (
     <main className="call-card">
       {editorLoginOpen && (
         <EditorLogin
           onSuccess={() => {
             setEditorLoginOpen(false);
-            setIsEditing(true);
+            void handleStartEditing();
           }}
           onCancel={() => setEditorLoginOpen(false)}
+        />
+      )}
+
+      {editMed && (
+        <MedicationEditorModal
+          medId={editMed.id}
+          initial={{
+            NAME: editMed.name,
+            UNIT: editMed.unit,
+            CONTENT: editMed.content,
+            RECIPE: editMed.recipe,
+          }}
+          open
+          onClose={() => setEditMed(null)}
+          onSaved={() => {
+            void reloadMedications();
+            notify("Препарат сохранён", "success");
+          }}
         />
       )}
 
@@ -501,7 +547,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
             <CallCardTemplateSection
               isEditing={isEditing}
               loading={loadingTemplate}
-              hasTemplate={!!template}
+              notice={templateNotice}
               fields={cardFields}
               draft={draftTemplate}
               onDraftChange={(patch) =>
@@ -516,7 +562,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
               pickerOpen={pickerOpen}
               pickedMed={pickedMed}
               createBlank={createBlank}
-              currentIcd10Id={selected.ID}
+              onEditMedication={setEditMed}
               draftMeds={draftMeds}
               onDraftMedsChange={setDraftMeds}
               onRequestPicker={() => setPickerOpen(true)}

@@ -17,7 +17,6 @@ export type MedicationTactic = {
   condition: string | null;
   doseA: number | null;
   doseC: number | null;
-  recipe: string | null;
   next: string | null;
   priority: string | null;
 };
@@ -27,6 +26,7 @@ export type MedicationView = {
   name: string | null;
   content: string | null;
   unit: string | null;
+  recipe: string | null;
   atcCode: string | null;
   atcName: string | null;
   atcNameEng: string | null;
@@ -54,7 +54,6 @@ function tacticToView(t: TactikItem): MedicationTactic {
     condition: t.CONDITION,
     doseA: t.DOSE_A,
     doseC: t.DOSE_C,
-    recipe: t.RECIPE,
     next: t.NEXT_TACTIK,
     priority: t.PRIORITY,
   };
@@ -67,6 +66,7 @@ export function toMedicationView(m: MedicationWithTactics): MedicationView {
     name: m.med.NAME,
     content: m.med.CONTENT,
     unit: m.med.UNIT,
+    recipe: m.med.RECIPE,
     icd10Id: m.med._icd10Id ?? null,
     ...atx,
     tactics: m.tactics.map(tacticToView),

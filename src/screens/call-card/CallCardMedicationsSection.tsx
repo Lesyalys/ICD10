@@ -15,7 +15,6 @@ type Props = {
   pickerOpen: boolean;
   pickedMed: AtxNode | null;
   createBlank: boolean;
-  currentIcd10Id: number;
   onRequestPicker: () => void;
   onPickExisting: (m: AtxNode) => void;
   onCreateNew: () => void;
@@ -24,6 +23,13 @@ type Props = {
   onEditStart: () => void;
   onSave: () => void;
   onCancel: () => void;
+  onEditMedication: (med: {
+    id: number;
+    name: string | null;
+    unit: string | null;
+    content: string | null;
+    recipe: string | null;
+  }) => void;
 };
 
 export default function CallCardMedicationsSection(props: Props) {
@@ -44,6 +50,7 @@ export default function CallCardMedicationsSection(props: Props) {
     onEditStart,
     onSave,
     onCancel,
+    onEditMedication,
   } = props;
 
   return (
@@ -56,7 +63,7 @@ export default function CallCardMedicationsSection(props: Props) {
           <h3 className="call-card__section-title">Лекарства</h3>
           <p className="call-card__section-sub">
             {isEditing
-              ? "Добавляйте, удаляйте и редактируйте препараты"
+              ? "Добавляйте, редактируйте и удаляйте препараты и тактики"
               : "Рекомендованные препараты"}
           </p>
         </div>
@@ -103,6 +110,7 @@ export default function CallCardMedicationsSection(props: Props) {
             pickedMed={pickedMed}
             createBlank={createBlank}
             onConsumeExternal={onConsumeExternal}
+            onEditMedication={onEditMedication}
             onChange={onDraftMedsChange}
           />
           <AddMedicationPicker

@@ -125,144 +125,6 @@ button {
     }
   }
 }
-.narcotic-form {
-  font-size: 13px;
-  line-height: 1.5;
-  color: #13263c;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 18px;
-  background: #fff;
-}
-
-.narcotic-form__title {
-  font-size: 14px;
-  font-weight: 700;
-  text-align: center;
-  margin: 0 0 16px;
-  line-height: 1.4;
-}
-
-.narcotic-form__row {
-  margin-bottom: 12px;
-}
-
-.narcotic-form__row--split {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.narcotic-form__inline {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.narcotic-form__field {
-  margin-bottom: 12px;
-}
-
-.narcotic-form__label {
-  font-size: 12px;
-  color: #64748b;
-  margin-bottom: 2px;
-}
-
-.narcotic-form__value {
-  border-bottom: 1px dashed #cbd5e1;
-  padding: 4px 2px;
-  min-height: 22px;
-  font-weight: 600;
-  word-break: break-word;
-}
-
-.narcotic-form__value--multiline {
-  min-height: 44px;
-  white-space: pre-wrap;
-}
-
-.narcotic-form__underline {
-  border-bottom: 1px dashed #cbd5e1;
-  padding: 0 6px;
-  min-width: 40px;
-  display: inline-block;
-  text-align: center;
-  font-weight: 600;
-}
-.narcotic-form {
-  font-size: 13px;
-  line-height: 1.5;
-  color: #13263c;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 18px;
-  background: #fff;
-}
-
-.narcotic-form__title {
-  font-size: 14px;
-  font-weight: 700;
-  text-align: center;
-  margin: 0 0 16px;
-  line-height: 1.5;
-}
-
-.narcotic-form__row {
-  margin-bottom: 12px;
-}
-
-.narcotic-form__row--split {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.narcotic-form__inline {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-}
-
-.narcotic-form__field {
-  margin-bottom: 12px;
-}
-
-.narcotic-form__label {
-  font-size: 12px;
-  color: #64748b;
-  margin-bottom: 2px;
-}
-
-.narcotic-form__hint {
-  font-size: 11px;
-  color: #94a3b8;
-  align-self: flex-end;
-}
-
-.narcotic-form__value {
-  border-bottom: 1px dashed #cbd5e1;
-  padding: 4px 2px;
-  min-height: 22px;
-  font-weight: 600;
-  word-break: break-word;
-}
-
-.narcotic-form__value--multiline {
-  min-height: 44px;
-  white-space: pre-wrap;
-}
-
-.narcotic-form__underline {
-  border-bottom: 1px dashed #cbd5e1;
-  padding: 0 6px;
-  min-width: 40px;
-  display: inline-block;
-  text-align: center;
-  font-weight: 600;
-}
 .dose-calc {
   border: 1px dashed #c7d2fe;
   background: #eef2ff;
@@ -818,13 +680,8 @@ button {
   pointer-events: none;
 }
 
-/* Показываем линию, если есть отступ слева (вложенный уровень).
-   Значение 24px — порог, при котором начинается вложенность. */
-.call-card__node-btn[style*="padding-left"]::before {
-  /* fallback для браузеров без :has — можно убрать, если не нужно */
-}
-
 /* Современный способ: у любого узла, кроме корневого,
+
    линия рисуется через вложенный контейнер */
 .call-card__node-children .call-card__node-btn::before {
   opacity: 1;
@@ -836,14 +693,11 @@ button {
   content: "";
   position: absolute;
   top: 50%;
+  left: calc(var(--depth, 0) * 16px + 8px);
   width: 10px;
   height: 1px;
   background: #dbe3ec;
   pointer-events: none;
-}
-
-.call-card__node-children .call-card__node-btn::after {
-  left: calc(var(--depth, 0) * 16px + 8px);
 }
 
 /* Вложенные уровни: отдельный фон и усиленная левая граница */
@@ -1127,8 +981,9 @@ button {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-top: 12px;
+  margin-left: auto;
 }
 
 .call-card__btn-edit {
@@ -1187,13 +1042,7 @@ button {
   opacity: 0.6;
   cursor: not-allowed;
 }
-.call-card__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-}
+
 .call-card__node-open {
   margin-right: 8px;
   padding: 4px 10px;
@@ -1208,4 +1057,74 @@ button {
 
 .call-card__node-open:hover {
   background: #f8fafc;
+}
+
+/* ============================================================
+   Toaster — всплывающие уведомления
+   ============================================================ */
+.toaster__item {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 26rem;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(15, 30, 50, 0.14);
+  font-size: 13px;
+  line-height: 1.4;
+  color: #13263c;
+}
+
+.toaster__item--error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.toaster__item--success {
+  border-color: #a7f3d0;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.toaster__text {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.toaster__close {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  padding: 0 2px;
+  font-size: 14px;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.6;
+}
+
+.toaster__close:hover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .toaster__item {
+    animation: toast-in 220ms ease-out both;
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
