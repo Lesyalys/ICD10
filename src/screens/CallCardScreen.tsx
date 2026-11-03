@@ -20,6 +20,7 @@ import {
   createMedicationForIcd10,
   linkExistingMedicationWithTactic,
   updateTactik,
+  updateLinkTactikText,
   unlinkTactic,
   unlinkMedicationFromIcd10,
 } from "../DB/queries.ts";
@@ -326,15 +327,15 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
         }
       }
 
-      // 2) Удаление тактик
+      // 2) Удаление тактик (текст живёт в строке связи — удаляем по linkId)
       for (const del of draftMeds.deletedTactics) {
         const med = medications.find((x) => x.id === del.medId);
         if (!med) continue;
-        const sourceId = med.icd10Id ?? selected.ID;
-        const res = await unlinkTactic(sourceId, del.medId, del.tactikId);
+        const tactic = med.tactics.find((x) => x.linkId === del.linkId);
+        const res = await unlinkTactic(del.linkId, tactic?.id ?? null);
         if (!res.ok) {
           throw new Error(
-            `Не удалось удалить тактику ${del.tactikId}: ${res.error ?? "unknown"}`,
+            `Не удалось удалить тактику ${del.linkId}: ${res.error ?? "unknown"}`,
           );
         }
       }
@@ -361,25 +362,32 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
         for (const t of m.tactics) {
           if (
             draftMeds.deletedTactics.some(
-              (x) => x.medId === m.id && x.tactikId === t.id,
+              (x) => x.medId === m.id && x.linkId === t.linkId,
             )
           ) {
             continue;
           }
-          const d = medDraft.tactics[t.id];
+          const d = medDraft.tactics[t.linkId];
           if (!d) continue;
 
           const doseA = d.doseA.trim() === "" ? null : Number(d.doseA);
           const doseC = d.doseC.trim() === "" ? null : Number(d.doseC);
 
+          // Текст тактики — в строке связи DIAGNOSIS_MEDICATION_TACTIC
+          if (d.text !== (t.text ?? "")) {
+            const ok = await updateLinkTactikText(t.linkId, d.text || null);
+            if (!ok)
+              throw new Error(`Не удалось сохранить текст тактики ${t.id}`);
+          }
+
+          // Остальные поля — в справочнике TACTIK
           const patch: Record<string, any> = {};
-          if (d.text !== (t.text ?? "")) patch.TACTIK_TEXT = d.text || null;
           if (d.routes !== (t.routes ?? "")) patch.ROUTES = d.routes || null;
           if (d.condition !== (t.condition ?? ""))
             patch.CONDITION = d.condition || null;
           if (doseA !== t.doseA) patch.DOSE_A = doseA;
           if (doseC !== t.doseC) patch.DOSE_C = doseC;
-          if (d.next !== (t.next ?? "")) patch.NEXT_TACTIK = d.next || null;
+          // if (d.next !== (t.next ?? "")) patch.NEXT_TACTIK = d.next || null;
           if (d.priority !== (t.priority ?? ""))
             patch.PRIORITY = d.priority || null;
 
@@ -390,7 +398,37 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
         }
       }
 
-      // 5) Новые препараты / новые тактики
+      // 5) Новые тактики к существующим препаратам
+      for (const [medIdStr, list] of Object.entries(draftMeds.newTactics)) {
+        const medId = Number(medIdStr);
+        if (draftMeds.deletedMeds.includes(medId)) continue;
+
+        for (const nt of list) {
+          const doseA = nt.doseA.trim() === "" ? null : Number(nt.doseA);
+          const doseC = nt.doseC.trim() === "" ? null : Number(nt.doseC);
+
+          const res = await linkExistingMedicationWithTactic(
+            selected.ID,
+            medId,
+            {
+              TACTIK_TEXT: nt.text || null,
+              ROUTES: nt.routes || null,
+              CONDITION: nt.condition || null,
+              DOSE_A: doseA,
+              DOSE_C: doseC,
+              // NEXT_TACTIK: nt.next || null,
+              PRIORITY: nt.priority || null,
+            },
+          );
+          if (!res.ok) {
+            throw new Error(
+              `Не удалось добавить тактику к препарату ${medId}: ${res.error ?? "unknown"}`,
+            );
+          }
+        }
+      }
+
+      // 6) Новые препараты
       for (const n of draftMeds.newMeds) {
         const t = n.tactic;
         const doseA = t.doseA.trim() === "" ? null : Number(t.doseA);
@@ -406,7 +444,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
               CONDITION: t.condition || null,
               DOSE_A: doseA,
               DOSE_C: doseC,
-              NEXT_TACTIK: t.next || null,
+              // NEXT_TACTIK: t.next || null,
               PRIORITY: t.priority || null,
             },
           );
@@ -427,7 +465,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
             CONDITION: t.condition || null,
             DOSE_A: doseA,
             DOSE_C: doseC,
-            NEXT_TACTIK: t.next || null,
+            // NEXT_TACTIK: t.next || null,
             PRIORITY: t.priority || null,
           });
           if (!created) {
@@ -436,7 +474,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
         }
       }
 
-      // 6) Перечитать
+      // 7) Перечитать
       const [smpRec, meds] = await Promise.all([
         fetchSmpByIcd10Id(selected.ID),
         fetchMedicationsForIcd10(selected.ID),
@@ -575,7 +613,12 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
               onCancel={resetEditing}
             />
 
-            <CallCardTacticsSection medications={medications} />
+            <CallCardTacticsSection
+              medications={medications}
+              isEditing={isEditing}
+              draftMeds={draftMeds}
+              onDraftMedsChange={setDraftMeds}
+            />
 
             <CallCardRecipesSection
               medications={medications}

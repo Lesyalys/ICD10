@@ -14,7 +14,6 @@ export type TacticDraft = {
   condition: string;
   doseA: string;
   doseC: string;
-  next: string;
   priority: string;
 };
 
@@ -37,6 +36,7 @@ export type NewMedDraft = {
 export type MedDrafts = Record<
   number,
   {
+    /** Ключ — linkId (ID строки DIAGNOSIS_MEDICATION_TACTIC). */
     tactics: Record<number, TacticDraft>;
   }
 >;
@@ -46,7 +46,8 @@ export type DraftsState = {
   newMeds: NewMedDraft[];
   newTactics: Record<number, NewTacticDraft[]>;
   deletedMeds: number[];
-  deletedTactics: Array<{ medId: number; tactikId: number }>;
+  /** Удалённые связи: текст тактики хранится в строке связи. */
+  deletedTactics: Array<{ medId: number; linkId: number }>;
 };
 
 export const emptyDraftsState: DraftsState = {
@@ -68,7 +69,6 @@ function emptyTacticDraft(): TacticDraft {
     condition: "",
     doseA: "",
     doseC: "",
-    next: "",
     priority: "",
   };
 }
@@ -80,7 +80,6 @@ function tacticToDraft(t: MedicationTactic): TacticDraft {
     condition: t.condition ?? "",
     doseA: t.doseA != null ? String(t.doseA) : "",
     doseC: t.doseC != null ? String(t.doseC) : "",
-    next: t.next ?? "",
     priority: t.priority ?? "",
   };
 }
@@ -127,7 +126,7 @@ export default function EditableMedicationsList({
     const initial: MedDrafts = {};
     for (const m of items) {
       const tactics: Record<number, TacticDraft> = {};
-      for (const t of m.tactics) tactics[t.id] = tacticToDraft(t);
+      for (const t of m.tactics) tactics[t.linkId] = tacticToDraft(t);
       initial[m.id] = { tactics };
     }
     const next: DraftsState = {
@@ -203,17 +202,17 @@ export default function EditableMedicationsList({
 
   function updateTactic(
     medId: number,
-    tactikId: number,
+    linkId: number,
     patch: Partial<TacticDraft>,
   ) {
     const med = state.drafts[medId] ?? { tactics: {} };
-    const base = med.tactics[tactikId] ?? emptyTacticDraft();
+    const base = med.tactics[linkId] ?? emptyTacticDraft();
     emit({
       ...state,
       drafts: {
         ...state.drafts,
         [medId]: {
-          tactics: { ...med.tactics, [tactikId]: { ...base, ...patch } },
+          tactics: { ...med.tactics, [linkId]: { ...base, ...patch } },
         },
       },
     });
@@ -262,15 +261,15 @@ export default function EditableMedicationsList({
     });
   }
 
-  function toggleDeleteTactic(medId: number, tactikId: number) {
+  function toggleDeleteTactic(medId: number, linkId: number) {
     const exists = state.deletedTactics.some(
-      (x) => x.medId === medId && x.tactikId === tactikId,
+      (x) => x.medId === medId && x.linkId === linkId,
     );
     const deletedTactics = exists
       ? state.deletedTactics.filter(
-          (x) => !(x.medId === medId && x.tactikId === tactikId),
+          (x) => !(x.medId === medId && x.linkId === linkId),
         )
-      : [...state.deletedTactics, { medId, tactikId }];
+      : [...state.deletedTactics, { medId, linkId }];
     emit({ ...state, deletedTactics });
   }
 
@@ -383,13 +382,14 @@ export default function EditableMedicationsList({
                 <div className="mt-2 space-y-2">
                   {m.tactics.map((t) => {
                     const tDeleted = state.deletedTactics.some(
-                      (x) => x.medId === m.id && x.tactikId === t.id,
+                      (x) => x.medId === m.id && x.linkId === t.linkId,
                     );
-                    const tDraft = medDraft.tactics[t.id] ?? tacticToDraft(t);
+                    const tDraft =
+                      medDraft.tactics[t.linkId] ?? tacticToDraft(t);
 
                     return (
                       <div
-                        key={t.id}
+                        key={t.linkId}
                         className={`rounded-lg border bg-white px-3 py-2 ${
                           tDeleted
                             ? "border-red-200 opacity-60"
@@ -407,7 +407,7 @@ export default function EditableMedicationsList({
                                   ? "bg-emerald-100 text-emerald-700"
                                   : "bg-red-50 text-red-600"
                               }`}
-                              onClick={() => toggleDeleteTactic(m.id, t.id)}
+                              onClick={() => toggleDeleteTactic(m.id, t.linkId)}
                               type="button"
                             >
                               {tDeleted ? "Восстановить" : "Удалить тактику"}
@@ -417,33 +417,35 @@ export default function EditableMedicationsList({
 
                         {isEditing && !tDeleted ? (
                           <div className="mt-2 space-y-2">
-                            <textarea
+                            {/* ← текст тактики (TACTIK_TEXT из строки связи) */}
+                            {/* <textarea
                               rows={2}
                               value={tDraft.text}
                               onChange={(e) =>
-                                updateTactic(m.id, t.id, {
+                                updateTactic(m.id, t.linkId, {
                                   text: e.target.value,
                                 })
                               }
-                              placeholder="Тактика"
+                              placeholder="Текст тактики"
                               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-                            />
-                            <RoutesSelect
-                              value={tDraft.routes}
-                              onChange={(v) =>
-                                updateTactic(m.id, t.id, { routes: v })
-                              }
-                            />
+                            /> */}
+
                             <input
                               type="text"
                               value={tDraft.condition}
                               onChange={(e) =>
-                                updateTactic(m.id, t.id, {
+                                updateTactic(m.id, t.linkId, {
                                   condition: e.target.value,
                                 })
                               }
                               placeholder="Условие"
                               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
+                            />
+                            <RoutesSelect
+                              value={tDraft.routes}
+                              onChange={(v) =>
+                                updateTactic(m.id, t.linkId, { routes: v })
+                              }
                             />
                             <div className="grid grid-cols-2 gap-2">
                               <input
@@ -451,7 +453,7 @@ export default function EditableMedicationsList({
                                 step="0.01"
                                 value={tDraft.doseA}
                                 onChange={(e) =>
-                                  updateTactic(m.id, t.id, {
+                                  updateTactic(m.id, t.linkId, {
                                     doseA: e.target.value,
                                   })
                                 }
@@ -463,7 +465,7 @@ export default function EditableMedicationsList({
                                 step="0.01"
                                 value={tDraft.doseC}
                                 onChange={(e) =>
-                                  updateTactic(m.id, t.id, {
+                                  updateTactic(m.id, t.linkId, {
                                     doseC: e.target.value,
                                   })
                                 }
@@ -475,16 +477,18 @@ export default function EditableMedicationsList({
                         ) : (
                           <div className="mt-1 text-[12px] text-slate-600">
                             {t.text && (
-                              <p className="whitespace-pre-wrap">{t.text}</p>
-                            )}
-                            {t.routes && (
-                              <p>
-                                <b>Пути:</b> {t.routes}
+                              <p className="whitespace-pre-wrap">
+                                <b>Тактика:</b> {t.text}
                               </p>
                             )}
                             {t.condition && (
                               <p>
                                 <b>Условие:</b> {t.condition}
+                              </p>
+                            )}
+                            {t.routes && (
+                              <p>
+                                <b>Пути:</b> {t.routes}
                               </p>
                             )}
                             {(t.doseA != null || t.doseC != null) && (
@@ -521,7 +525,7 @@ export default function EditableMedicationsList({
                       </button>
                     </div>
                     <div className="mt-2 space-y-2">
-                      <textarea
+                      {/* <textarea
                         rows={2}
                         value={nt.text}
                         onChange={(e) =>
@@ -531,7 +535,7 @@ export default function EditableMedicationsList({
                         }
                         placeholder="Тактика"
                         className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-                      />
+                      /> */}
                       <RoutesSelect
                         value={nt.routes}
                         onChange={(v) =>
@@ -648,7 +652,7 @@ export default function EditableMedicationsList({
 
           <div className="mt-2 space-y-2">
             <p className="text-[11.5px] font-bold text-slate-500">Тактика</p>
-            <textarea
+            {/* <textarea
               rows={2}
               value={n.tactic.text}
               onChange={(e) =>
@@ -656,7 +660,7 @@ export default function EditableMedicationsList({
               }
               placeholder="Тактика"
               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-            />
+            /> */}
             <RoutesSelect
               value={n.tactic.routes}
               onChange={(v) => updateNewMedTactic(n.tempId, { routes: v })}

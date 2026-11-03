@@ -12,12 +12,12 @@ export function first<T>(v: T | T[] | null | undefined): T | null {
 
 export type MedicationTactic = {
   id: number;
+  linkId: number;
   text: string | null;
   routes: string | null;
   condition: string | null;
   doseA: number | null;
   doseC: number | null;
-  next: string | null;
   priority: string | null;
 };
 
@@ -49,12 +49,12 @@ function atxToView(a: AtxItem | null): {
 function tacticToView(t: TactikItem): MedicationTactic {
   return {
     id: t.ID,
+    linkId: t.LINK_ID,
     text: t.TACTIK_TEXT,
     routes: t.ROUTES,
     condition: t.CONDITION,
     doseA: t.DOSE_A,
     doseC: t.DOSE_C,
-    next: t.NEXT_TACTIK,
     priority: t.PRIORITY,
   };
 }
