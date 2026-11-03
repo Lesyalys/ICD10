@@ -15,6 +15,17 @@ type Props = {
   onClose: () => void;
 };
 
+export type MedicationCondition = {
+  ID: number; // TACTIK.ID
+  LINK_ID: number; // DIAGNOSIS_MEDICATION_TACTIC.ID
+  TACTIK_TEXT: string | null;
+  ROUTES: string | null;
+  CONDITION: string | null;
+  DOSE_A: number | null;
+  DOSE_C: number | null;
+  PRIORITY: string | null;
+};
+
 export default function AddMedicationPicker({
   open,
   alreadyLinkedIds,

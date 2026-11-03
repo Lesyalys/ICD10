@@ -13,3 +13,25 @@ export type TemplateDraft = {
   OBJECTIVELY: string;
   LOCAL_STATUS: string;
 };
+
+export type TacticDraft = {
+  text: string;
+};
+
+export type NewTacticDraft = {
+  tempId: string;
+  text: string;
+  priority: string;
+};
+
+export type TacticsDrafts = {
+  drafts: Record<number, TacticDraft>; // key = linkId
+  newTactics: NewTacticDraft[];
+  deletedTactics: number[]; // linkId
+};
+
+export const emptyTacticsDrafts: TacticsDrafts = {
+  drafts: {},
+  newTactics: [],
+  deletedTactics: [],
+};

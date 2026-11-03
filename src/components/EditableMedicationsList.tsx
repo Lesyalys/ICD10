@@ -1,15 +1,17 @@
 // src/components/EditableMedicationsList.tsx
 import { useEffect, useState } from "react";
 import type { AtxNode } from "../DB/queries.ts";
-import type { MedicationView, MedicationTactic } from "../utils/normalize.ts";
+import type {
+  MedicationView,
+  MedicationConditionView,
+} from "../utils/normalize.ts";
 import RoutesSelect from "./RoutesSelect.tsx";
 
 /* ============================================================
    ТИПЫ
    ============================================================ */
 
-export type TacticDraft = {
-  text: string;
+export type ConditionDraft = {
   routes: string;
   condition: string;
   doseA: string;
@@ -17,7 +19,7 @@ export type TacticDraft = {
   priority: string;
 };
 
-export type NewTacticDraft = TacticDraft & {
+export type NewConditionDraft = ConditionDraft & {
   tempId: string;
   existingId: number | null;
 };
@@ -28,43 +30,41 @@ export type NewMedDraft = {
   name: string;
   unit: string;
   content: string;
-  /** Рецепт хранится на препарате (ATX_AMBULANCE.RECIPE), не на тактике */
+  /** Рецепт хранится на препарате (ATX_AMBULANCE.RECIPE) */
   recipe: string;
-  tactic: TacticDraft;
+  condition: ConditionDraft;
 };
 
 export type MedDrafts = Record<
   number,
   {
     /** Ключ — linkId (ID строки DIAGNOSIS_MEDICATION_TACTIC). */
-    tactics: Record<number, TacticDraft>;
+    conditions: Record<number, ConditionDraft>;
   }
 >;
 
 export type DraftsState = {
   drafts: MedDrafts;
   newMeds: NewMedDraft[];
-  newTactics: Record<number, NewTacticDraft[]>;
+  newConditions: Record<number, NewConditionDraft[]>;
   deletedMeds: number[];
-  /** Удалённые связи: текст тактики хранится в строке связи. */
-  deletedTactics: Array<{ medId: number; linkId: number }>;
+  deletedConditions: Array<{ medId: number; linkId: number }>;
 };
 
 export const emptyDraftsState: DraftsState = {
   drafts: {},
   newMeds: [],
-  newTactics: {},
+  newConditions: {},
   deletedMeds: [],
-  deletedTactics: [],
+  deletedConditions: [],
 };
 
 /* ============================================================
    ХЕЛПЕРЫ
    ============================================================ */
 
-function emptyTacticDraft(): TacticDraft {
+function emptyConditionDraft(): ConditionDraft {
   return {
-    text: "",
     routes: "",
     condition: "",
     doseA: "",
@@ -73,14 +73,13 @@ function emptyTacticDraft(): TacticDraft {
   };
 }
 
-function tacticToDraft(t: MedicationTactic): TacticDraft {
+function conditionToDraft(c: MedicationConditionView): ConditionDraft {
   return {
-    text: t.text ?? "",
-    routes: t.routes ?? "",
-    condition: t.condition ?? "",
-    doseA: t.doseA != null ? String(t.doseA) : "",
-    doseC: t.doseC != null ? String(t.doseC) : "",
-    priority: t.priority ?? "",
+    routes: c.routes ?? "",
+    condition: c.condition ?? "",
+    doseA: c.doseA != null ? String(c.doseA) : "",
+    doseC: c.doseC != null ? String(c.doseC) : "",
+    priority: c.priority ?? "",
   };
 }
 
@@ -125,23 +124,23 @@ export default function EditableMedicationsList({
   useEffect(() => {
     const initial: MedDrafts = {};
     for (const m of items) {
-      const tactics: Record<number, TacticDraft> = {};
-      for (const t of m.tactics) tactics[t.linkId] = tacticToDraft(t);
-      initial[m.id] = { tactics };
+      const conditions: Record<number, ConditionDraft> = {};
+      for (const c of m.conditions) conditions[c.linkId] = conditionToDraft(c);
+      initial[m.id] = { conditions };
     }
     const next: DraftsState = {
       drafts: initial,
       newMeds: [],
-      newTactics: {},
+      newConditions: {},
       deletedMeds: [],
-      deletedTactics: [],
+      deletedConditions: [],
     };
     setState(next);
     onChange(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  // pickedMed → добавить новый препарат (с одной пустой тактикой)
+  // pickedMed → добавить новый препарат (с одним пустым условием)
   useEffect(() => {
     if (!pickedMed) return;
     if (pickedMed.LEVEL !== 2) {
@@ -163,7 +162,7 @@ export default function EditableMedicationsList({
           unit: pickedMed.UNIT ?? "",
           content: pickedMed.CONTENT ?? "",
           recipe: "",
-          tactic: emptyTacticDraft(),
+          condition: emptyConditionDraft(),
         },
       ],
     };
@@ -186,7 +185,7 @@ export default function EditableMedicationsList({
           unit: "",
           content: "",
           recipe: "",
-          tactic: emptyTacticDraft(),
+          condition: emptyConditionDraft(),
         },
       ],
     };
@@ -200,77 +199,77 @@ export default function EditableMedicationsList({
     onChange(next);
   }
 
-  function updateTactic(
+  function updateCondition(
     medId: number,
     linkId: number,
-    patch: Partial<TacticDraft>,
+    patch: Partial<ConditionDraft>,
   ) {
-    const med = state.drafts[medId] ?? { tactics: {} };
-    const base = med.tactics[linkId] ?? emptyTacticDraft();
+    const med = state.drafts[medId] ?? { conditions: {} };
+    const base = med.conditions[linkId] ?? emptyConditionDraft();
     emit({
       ...state,
       drafts: {
         ...state.drafts,
         [medId]: {
-          tactics: { ...med.tactics, [linkId]: { ...base, ...patch } },
+          conditions: { ...med.conditions, [linkId]: { ...base, ...patch } },
         },
       },
     });
   }
 
-  function addNewTactic(medId: number) {
-    const t: NewTacticDraft = {
-      ...emptyTacticDraft(),
-      tempId: `t-${medId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  function addNewCondition(medId: number) {
+    const c: NewConditionDraft = {
+      ...emptyConditionDraft(),
+      tempId: `c-${medId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       existingId: null,
     };
     emit({
       ...state,
-      newTactics: {
-        ...state.newTactics,
-        [medId]: [...(state.newTactics[medId] ?? []), t],
+      newConditions: {
+        ...state.newConditions,
+        [medId]: [...(state.newConditions[medId] ?? []), c],
       },
     });
   }
 
-  function updateNewTactic(
+  function updateNewCondition(
     medId: number,
     tempId: string,
-    patch: Partial<NewTacticDraft>,
+    patch: Partial<NewConditionDraft>,
   ) {
     emit({
       ...state,
-      newTactics: {
-        ...state.newTactics,
-        [medId]: (state.newTactics[medId] ?? []).map((t) =>
-          t.tempId === tempId ? { ...t, ...patch } : t,
+      newConditions: {
+        ...state.newConditions,
+        [medId]: (state.newConditions[medId] ?? []).map((c) =>
+          c.tempId === tempId ? { ...c, ...patch } : c,
         ),
       },
     });
   }
 
-  function removeNewTactic(medId: number, tempId: string) {
+  function removeNewCondition(medId: number, tempId: string) {
     emit({
       ...state,
-      newTactics: {
-        ...state.newTactics,
-        [medId]: (state.newTactics[medId] ?? []).filter(
-          (t) => t.tempId !== tempId,
+      newConditions: {
+        ...state.newConditions,
+        [medId]: (state.newConditions[medId] ?? []).filter(
+          (c) => c.tempId !== tempId,
         ),
       },
     });
   }
 
-  function toggleDeleteTactic(medId: number, linkId: number) {
-    const exists = state.deletedTactics.some(
+  function toggleDeleteCondition(medId: number, linkId: number) {
+    const exists = state.deletedConditions.some(
       (x) => x.medId === medId && x.linkId === linkId,
     );
-    const deletedTactics = exists
-      ? state.deletedTactics.filter(
+    const deletedConditions = exists
+      ? state.deletedConditions.filter(
           (x) => !(x.medId === medId && x.linkId === linkId),
         )
-      : [...state.deletedTactics, { medId, linkId }];
-    emit({ ...state, deletedTactics });
+      : [...state.deletedConditions, { medId, linkId }];
+    emit({ ...state, deletedConditions });
   }
 
   function toggleDeleteMed(medId: number) {
@@ -290,11 +289,16 @@ export default function EditableMedicationsList({
     });
   }
 
-  function updateNewMedTactic(tempId: string, patch: Partial<TacticDraft>) {
+  function updateNewMedCondition(
+    tempId: string,
+    patch: Partial<ConditionDraft>,
+  ) {
     emit({
       ...state,
       newMeds: state.newMeds.map((n) =>
-        n.tempId === tempId ? { ...n, tactic: { ...n.tactic, ...patch } } : n,
+        n.tempId === tempId
+          ? { ...n, condition: { ...n.condition, ...patch } }
+          : n,
       ),
     });
   }
@@ -315,7 +319,7 @@ export default function EditableMedicationsList({
       {/* Существующие препараты */}
       {items.map((m) => {
         const isDeleted = state.deletedMeds.includes(m.id);
-        const medDraft = state.drafts[m.id] ?? { tactics: {} };
+        const medDraft = state.drafts[m.id] ?? { conditions: {} };
 
         return (
           <div
@@ -378,63 +382,52 @@ export default function EditableMedicationsList({
 
             {!isDeleted && (
               <>
-                {/* Существующие тактики */}
+                {/* Существующие условия применения */}
                 <div className="mt-2 space-y-2">
-                  {m.tactics.map((t) => {
-                    const tDeleted = state.deletedTactics.some(
-                      (x) => x.medId === m.id && x.linkId === t.linkId,
+                  {m.conditions.map((c) => {
+                    const cDeleted = state.deletedConditions.some(
+                      (x) => x.medId === m.id && x.linkId === c.linkId,
                     );
-                    const tDraft =
-                      medDraft.tactics[t.linkId] ?? tacticToDraft(t);
+                    const cDraft =
+                      medDraft.conditions[c.linkId] ?? conditionToDraft(c);
 
                     return (
                       <div
-                        key={t.linkId}
+                        key={c.linkId}
                         className={`rounded-lg border bg-white px-3 py-2 ${
-                          tDeleted
+                          cDeleted
                             ? "border-red-200 opacity-60"
                             : "border-slate-200"
                         }`}
                       >
                         <div className="flex items-center justify-between">
                           <p className="text-[11.5px] font-bold text-slate-500">
-                            Тактика #{t.id}
+                            Условие #{c.linkId}
                           </p>
                           {isEditing && (
                             <button
                               className={`rounded-md px-2 py-0.5 text-[11px] font-bold ${
-                                tDeleted
+                                cDeleted
                                   ? "bg-emerald-100 text-emerald-700"
                                   : "bg-red-50 text-red-600"
                               }`}
-                              onClick={() => toggleDeleteTactic(m.id, t.linkId)}
+                              onClick={() =>
+                                toggleDeleteCondition(m.id, c.linkId)
+                              }
                               type="button"
                             >
-                              {tDeleted ? "Восстановить" : "Удалить тактику"}
+                              {cDeleted ? "Восстановить" : "Удалить условие"}
                             </button>
                           )}
                         </div>
 
-                        {isEditing && !tDeleted ? (
+                        {isEditing && !cDeleted ? (
                           <div className="mt-2 space-y-2">
-                            {/* ← текст тактики (TACTIK_TEXT из строки связи) */}
-                            {/* <textarea
-                              rows={2}
-                              value={tDraft.text}
-                              onChange={(e) =>
-                                updateTactic(m.id, t.linkId, {
-                                  text: e.target.value,
-                                })
-                              }
-                              placeholder="Текст тактики"
-                              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-                            /> */}
-
                             <input
                               type="text"
-                              value={tDraft.condition}
+                              value={cDraft.condition}
                               onChange={(e) =>
-                                updateTactic(m.id, t.linkId, {
+                                updateCondition(m.id, c.linkId, {
                                   condition: e.target.value,
                                 })
                               }
@@ -442,18 +435,18 @@ export default function EditableMedicationsList({
                               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
                             />
                             <RoutesSelect
-                              value={tDraft.routes}
+                              value={cDraft.routes}
                               onChange={(v) =>
-                                updateTactic(m.id, t.linkId, { routes: v })
+                                updateCondition(m.id, c.linkId, { routes: v })
                               }
                             />
                             <div className="grid grid-cols-2 gap-2">
                               <input
                                 type="number"
                                 step="0.01"
-                                value={tDraft.doseA}
+                                value={cDraft.doseA}
                                 onChange={(e) =>
-                                  updateTactic(m.id, t.linkId, {
+                                  updateCondition(m.id, c.linkId, {
                                     doseA: e.target.value,
                                   })
                                 }
@@ -463,9 +456,9 @@ export default function EditableMedicationsList({
                               <input
                                 type="number"
                                 step="0.01"
-                                value={tDraft.doseC}
+                                value={cDraft.doseC}
                                 onChange={(e) =>
-                                  updateTactic(m.id, t.linkId, {
+                                  updateCondition(m.id, c.linkId, {
                                     doseC: e.target.value,
                                   })
                                 }
@@ -473,30 +466,41 @@ export default function EditableMedicationsList({
                                 className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
                               />
                             </div>
+                            <input
+                              type="text"
+                              value={cDraft.priority}
+                              onChange={(e) =>
+                                updateCondition(m.id, c.linkId, {
+                                  priority: e.target.value,
+                                })
+                              }
+                              placeholder="Приоритет"
+                              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
+                            />
                           </div>
                         ) : (
                           <div className="mt-1 text-[12px] text-slate-600">
-                            {t.text && (
-                              <p className="whitespace-pre-wrap">
-                                <b>Тактика:</b> {t.text}
-                              </p>
-                            )}
-                            {t.condition && (
+                            {c.condition && (
                               <p>
-                                <b>Условие:</b> {t.condition}
+                                <b>Условие:</b> {c.condition}
                               </p>
                             )}
-                            {t.routes && (
+                            {c.routes && (
                               <p>
-                                <b>Пути:</b> {t.routes}
+                                <b>Пути:</b> {c.routes}
                               </p>
                             )}
-                            {(t.doseA != null || t.doseC != null) && (
+                            {(c.doseA != null || c.doseC != null) && (
                               <p>
                                 <b>Дозы:</b>{" "}
-                                {t.doseA != null && <>взр. {t.doseA}</>}
-                                {t.doseA != null && t.doseC != null && " · "}
-                                {t.doseC != null && <>реб. {t.doseC}</>}
+                                {c.doseA != null && <>взр. {c.doseA}</>}
+                                {c.doseA != null && c.doseC != null && " · "}
+                                {c.doseC != null && <>реб. {c.doseC}</>}
+                              </p>
+                            )}
+                            {c.priority && (
+                              <p>
+                                <b>Приоритет:</b> {c.priority}
                               </p>
                             )}
                           </div>
@@ -506,49 +510,49 @@ export default function EditableMedicationsList({
                   })}
                 </div>
 
-                {/* Новые тактики для существующего препарата */}
-                {(state.newTactics[m.id] ?? []).map((nt) => (
+                {/* Новые условия для существующего препарата */}
+                {(state.newConditions[m.id] ?? []).map((nc) => (
                   <div
-                    key={nt.tempId}
+                    key={nc.tempId}
                     className="mt-2 rounded-lg border border-dashed border-emerald-300 bg-emerald-50/40 px-3 py-2"
                   >
                     <div className="flex items-center justify-between">
                       <p className="text-[11.5px] font-bold text-emerald-700">
-                        Новая тактика
+                        Новое условие
                       </p>
                       <button
                         className="rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-600"
-                        onClick={() => removeNewTactic(m.id, nt.tempId)}
+                        onClick={() => removeNewCondition(m.id, nc.tempId)}
                         type="button"
                       >
                         Убрать
                       </button>
                     </div>
                     <div className="mt-2 space-y-2">
-                      {/* <textarea
-                        rows={2}
-                        value={nt.text}
+                      <input
+                        type="text"
+                        value={nc.condition}
                         onChange={(e) =>
-                          updateNewTactic(m.id, nt.tempId, {
-                            text: e.target.value,
+                          updateNewCondition(m.id, nc.tempId, {
+                            condition: e.target.value,
                           })
                         }
-                        placeholder="Тактика"
+                        placeholder="Условие"
                         className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-                      /> */}
+                      />
                       <RoutesSelect
-                        value={nt.routes}
+                        value={nc.routes}
                         onChange={(v) =>
-                          updateNewTactic(m.id, nt.tempId, { routes: v })
+                          updateNewCondition(m.id, nc.tempId, { routes: v })
                         }
                       />
                       <div className="grid grid-cols-2 gap-2">
                         <input
                           type="number"
                           step="0.01"
-                          value={nt.doseA}
+                          value={nc.doseA}
                           onChange={(e) =>
-                            updateNewTactic(m.id, nt.tempId, {
+                            updateNewCondition(m.id, nc.tempId, {
                               doseA: e.target.value,
                             })
                           }
@@ -558,9 +562,9 @@ export default function EditableMedicationsList({
                         <input
                           type="number"
                           step="0.01"
-                          value={nt.doseC}
+                          value={nc.doseC}
                           onChange={(e) =>
-                            updateNewTactic(m.id, nt.tempId, {
+                            updateNewCondition(m.id, nc.tempId, {
                               doseC: e.target.value,
                             })
                           }
@@ -576,9 +580,9 @@ export default function EditableMedicationsList({
                   <button
                     type="button"
                     className="mt-2 w-full rounded-lg border border-dashed border-emerald-400 bg-emerald-50 py-1.5 text-[11.5px] font-bold text-emerald-700 hover:bg-emerald-100"
-                    onClick={() => addNewTactic(m.id)}
+                    onClick={() => addNewCondition(m.id)}
                   >
-                    + Добавить тактику
+                    + Добавить условие
                   </button>
                 )}
               </>
@@ -596,7 +600,7 @@ export default function EditableMedicationsList({
           <div className="flex items-center justify-between">
             <p className="text-[12px] font-bold text-emerald-700">
               {n.existingId
-                ? `Дополнительная тактика для препарата «${n.name || "—"}»`
+                ? `Дополнительное условие для препарата «${n.name || "—"}»`
                 : "Новый препарат"}
             </p>
             <button
@@ -651,36 +655,29 @@ export default function EditableMedicationsList({
           )}
 
           <div className="mt-2 space-y-2">
-            <p className="text-[11.5px] font-bold text-slate-500">Тактика</p>
-            {/* <textarea
-              rows={2}
-              value={n.tactic.text}
-              onChange={(e) =>
-                updateNewMedTactic(n.tempId, { text: e.target.value })
-              }
-              placeholder="Тактика"
-              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
-            /> */}
-            <RoutesSelect
-              value={n.tactic.routes}
-              onChange={(v) => updateNewMedTactic(n.tempId, { routes: v })}
-            />
+            <p className="text-[11.5px] font-bold text-slate-500">
+              Условие применения
+            </p>
             <input
               type="text"
-              value={n.tactic.condition}
+              value={n.condition.condition}
               onChange={(e) =>
-                updateNewMedTactic(n.tempId, { condition: e.target.value })
+                updateNewMedCondition(n.tempId, { condition: e.target.value })
               }
               placeholder="Условие"
               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
+            />
+            <RoutesSelect
+              value={n.condition.routes}
+              onChange={(v) => updateNewMedCondition(n.tempId, { routes: v })}
             />
             <div className="grid grid-cols-2 gap-2">
               <input
                 type="number"
                 step="0.01"
-                value={n.tactic.doseA}
+                value={n.condition.doseA}
                 onChange={(e) =>
-                  updateNewMedTactic(n.tempId, { doseA: e.target.value })
+                  updateNewMedCondition(n.tempId, { doseA: e.target.value })
                 }
                 placeholder="Доза взр."
                 className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"
@@ -688,9 +685,9 @@ export default function EditableMedicationsList({
               <input
                 type="number"
                 step="0.01"
-                value={n.tactic.doseC}
+                value={n.condition.doseC}
                 onChange={(e) =>
-                  updateNewMedTactic(n.tempId, { doseC: e.target.value })
+                  updateNewMedCondition(n.tempId, { doseC: e.target.value })
                 }
                 placeholder="Доза реб."
                 className="rounded-md border border-slate-200 bg-white px-2 py-1.5 text-[13px]"

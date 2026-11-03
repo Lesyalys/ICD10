@@ -1,7 +1,9 @@
+// src/components/DiseaseTemplateCard.tsx
 import MedicationsList from "./MedicationsList.tsx";
 import TacticsList from "./TacticsList.tsx";
 import RecipesList from "./RecipesList.tsx";
 import type { MedicationView } from "../utils/normalize.ts";
+import type { DiagnosisTactic } from "../DB/queries.ts";
 import MedicalField from "./MedicalField.tsx";
 
 const EMPTY = "—";
@@ -14,9 +16,14 @@ type Props = {
     LOCAL_STATUS: string | null;
   } | null;
   medications: MedicationView[];
+  tactics: DiagnosisTactic[];
 };
 
-export default function DiseaseTemplateCard({ template, medications }: Props) {
+export default function DiseaseTemplateCard({
+  template,
+  medications,
+  tactics,
+}: Props) {
   return (
     <>
       {/* Общие поля */}
@@ -67,11 +74,11 @@ export default function DiseaseTemplateCard({ template, medications }: Props) {
           <div>
             <h3 className="text-[15px] font-extrabold">Тактика</h3>
             <p className="text-[11px] text-slate-400">
-              Дозы и рекомендации по применению
+              Текст тактики по диагнозу
             </p>
           </div>
         </div>
-        <TacticsList items={medications} />
+        <TacticsList tactics={tactics} />
       </section>
 
       {/* Рецепты */}

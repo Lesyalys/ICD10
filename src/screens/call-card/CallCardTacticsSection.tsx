@@ -1,18 +1,17 @@
-// src/screens/call-card/CallCardTacticsSection.tsx
 import TacticsList from "../../components/TacticsList.tsx";
-import type { MedicationView } from "../../utils/normalize.ts";
-import type { DraftsState } from "../../components/EditableMedicationsList.tsx";
+import type { DiagnosisTactic } from "../../DB/queries.ts";
+import type { TacticsDrafts } from "./types.ts";
 
 export default function CallCardTacticsSection({
-  medications,
+  tactics,
   isEditing,
-  draftMeds,
-  onDraftMedsChange,
+  drafts,
+  onDraftsChange,
 }: {
-  medications: MedicationView[];
+  tactics: DiagnosisTactic[];
   isEditing: boolean;
-  draftMeds: DraftsState;
-  onDraftMedsChange: (s: DraftsState) => void;
+  drafts: TacticsDrafts;
+  onDraftsChange: (d: TacticsDrafts) => void;
 }) {
   return (
     <section className="border-t-[7px] border-[#f2f5f7] px-5 py-5">
@@ -28,10 +27,10 @@ export default function CallCardTacticsSection({
         </div>
       </div>
       <TacticsList
-        items={medications}
+        tactics={tactics}
         isEditing={isEditing}
-        draftMeds={draftMeds}
-        onDraftMedsChange={onDraftMedsChange}
+        drafts={drafts}
+        onDraftsChange={onDraftsChange}
       />
     </section>
   );

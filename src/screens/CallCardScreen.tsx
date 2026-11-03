@@ -15,17 +15,25 @@ import {
   fetchSmpChildren,
   searchSmpIcd10,
   fetchSmpParentIdsWithChildren,
-  fetchMedicationsForIcd10,
+  fetchDiagnosisCard,
   updateDiseaseTemplate,
   createMedicationForIcd10,
   linkExistingMedicationWithTactic,
   updateTactik,
-  updateLinkTactikText,
   unlinkTactic,
   unlinkMedicationFromIcd10,
+  createDiagnosisTactic,
+  updateDiagnosisTacticText,
+  unlinkDiagnosisTactic,
 } from "../DB/queries.ts";
-import type { DiseaseTemplateFull, AtxNode, SmpIcd10 } from "../DB/queries.ts";
-import { flattenMedications } from "../utils/normalize.ts";
+import type {
+  DiseaseTemplateFull,
+  AtxNode,
+  SmpIcd10,
+  DiagnosisTactic,
+  MedicationWithCondition,
+} from "../DB/queries.ts";
+import { flattenConditions } from "../utils/normalize.ts";
 
 import CallCardHeader from "./call-card/CallCardHeader.tsx";
 import CallCardMkbTree from "./call-card/CallCardMkbTree.tsx";
@@ -34,7 +42,13 @@ import CallCardTemplateSection from "./call-card/CallCardTemplateSection.tsx";
 import CallCardMedicationsSection from "./call-card/CallCardMedicationsSection.tsx";
 import CallCardTacticsSection from "./call-card/CallCardTacticsSection.tsx";
 import CallCardRecipesSection from "./call-card/CallCardRecipesSection.tsx";
-import type { Icd10Item, TemplateDraft } from "./call-card/types.ts";
+import {
+  emptyTacticsDrafts,
+  type Icd10Item,
+  type TemplateDraft,
+  type TacticDraft,
+  type TacticsDrafts,
+} from "./call-card/types.ts";
 
 const emptyTemplateDraft: TemplateDraft = {
   COMPLAINTS: "",
@@ -52,8 +66,15 @@ function templateToDraft(tpl: DiseaseTemplateFull | null): TemplateDraft {
   };
 }
 
+function tacticsToDrafts(tactics: DiagnosisTactic[]): TacticsDrafts {
+  const drafts: Record<number, TacticDraft> = {};
+  for (const t of tactics) drafts[t.linkId] = { text: t.text };
+  return { drafts, newTactics: [], deletedTactics: [] };
+}
+
 export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   const [query, setQuery] = useState("");
+
   const [nodes, setNodes] = useState<Record<string, Icd10Item[]>>({});
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [loadingNodes, setLoadingNodes] = useState<Set<number | "root">>(
@@ -68,8 +89,11 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   const [smp, setSmp] = useState<SmpIcd10 | null>(null);
   const [template, setTemplate] = useState<DiseaseTemplateFull | null>(null);
   const [medicationsRaw, setMedicationsRaw] = useState<
-    Awaited<ReturnType<typeof fetchMedicationsForIcd10>> | []
+    MedicationWithCondition[]
   >([]);
+  const [diagnosisTactics, setDiagnosisTactics] = useState<DiagnosisTactic[]>(
+    [],
+  );
   const [loadingTemplate, setLoadingTemplate] = useState(false);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -80,8 +104,10 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   const [draftTemplate, setDraftTemplate] =
     useState<TemplateDraft>(emptyTemplateDraft);
   const [draftMeds, setDraftMeds] = useState<DraftsState>(emptyDraftMeds);
+  const [draftTactics, setDraftTactics] =
+    useState<TacticsDrafts>(emptyTacticsDrafts);
 
-  // ← ДОБАВЛЕНО: модалка логина
+  // Модалка логина
   const [editorLoginOpen, setEditorLoginOpen] = useState(false);
 
   // Модалка редактирования карточки препарата (ATX_AMBULANCE)
@@ -141,11 +167,11 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   }, [query]);
 
   const medications = useMemo(
-    () => flattenMedications(medicationsRaw as any),
+    () => flattenConditions(medicationsRaw),
     [medicationsRaw],
   );
 
-  // --- Клик «Режим редактирования»: проверяем сессию ---
+  // --- Клик «Режим редактирования» ---
   async function handleStartEditing() {
     if (!selected) return;
 
@@ -155,7 +181,6 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
       return;
     }
 
-    // Диагноз обязан существовать в SMP_ICD10 — создаём запись и шаблон при отсутствии
     if (!smp || !template) {
       const ensured = await ensureSmpCard(selected.ID);
       if (!ensured) {
@@ -209,6 +234,8 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     setSmp(null);
     setTemplate(null);
     setMedicationsRaw([]);
+    setDiagnosisTactics([]);
+    setDraftTactics(emptyTacticsDrafts);
     setLoadingTemplate(true);
     setIsEditing(false);
     setDraftMeds(emptyDraftMeds);
@@ -218,9 +245,9 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     setPickerOpen(false);
     setEditMed(null);
 
-    const [smpRec, meds] = await Promise.all([
+    const [smpRec, card] = await Promise.all([
       fetchSmpByIcd10Id(item.ID),
-      fetchMedicationsForIcd10(item.ID),
+      fetchDiagnosisCard(item.ID),
     ]);
     setSmp(smpRec);
 
@@ -229,7 +256,9 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
       tpl = await fetchTemplateById(Number(smpRec.DISEASE_TEMPLATES_ID));
     }
     setTemplate(tpl);
-    setMedicationsRaw(meds);
+    setMedicationsRaw(card.medications);
+    setDiagnosisTactics(card.tactics);
+    setDraftTactics(tacticsToDrafts(card.tactics));
     setDraftTemplate(templateToDraft(tpl));
     setLoadingTemplate(false);
   }
@@ -241,17 +270,19 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
   function resetEditing() {
     setDraftTemplate(templateToDraft(template));
     setDraftMeds(emptyDraftMeds);
+    setDraftTactics(tacticsToDrafts(diagnosisTactics));
     setPickedMed(null);
     setCreateBlank(false);
     setPickerOpen(false);
     setIsEditing(false);
   }
 
-  // Перечитать препараты после сохранения карточки из модалки
   async function reloadMedications() {
     if (!selected) return;
-    const meds = await fetchMedicationsForIcd10(selected.ID);
-    setMedicationsRaw(meds);
+    const card = await fetchDiagnosisCard(selected.ID);
+    setMedicationsRaw(card.medications);
+    setDiagnosisTactics(card.tactics);
+    setDraftTactics(tacticsToDrafts(card.tactics));
   }
 
   function handleQueryChange(v: string) {
@@ -260,6 +291,8 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     setSmp(null);
     setTemplate(null);
     setMedicationsRaw([]);
+    setDiagnosisTactics([]);
+    setDraftTactics(emptyTacticsDrafts);
     setIsEditing(false);
   }
   function handleClearQuery() {
@@ -270,6 +303,8 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     setSmp(null);
     setTemplate(null);
     setMedicationsRaw([]);
+    setDiagnosisTactics([]);
+    setDraftTactics(emptyTacticsDrafts);
     setIsEditing(false);
     setQuery("");
   }
@@ -295,7 +330,7 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     if (!selected) return;
     setSaving(true);
     try {
-      // 1) Диагноз в SMP_ICD10 + шаблон (обеспечиваем наличие)
+      // 1) Диагноз в SMP_ICD10 + шаблон
       let tpl = template;
       if (!smp || !tpl) {
         const ensured = await ensureSmpCard(selected.ID);
@@ -305,7 +340,6 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
         setTemplate(tpl);
       }
 
-      // Шаблон
       if (tpl) {
         const patch: Partial<
           Pick<
@@ -327,20 +361,56 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
         }
       }
 
-      // 2) Удаление тактик (текст живёт в строке связи — удаляем по linkId)
-      for (const del of draftMeds.deletedTactics) {
-        const med = medications.find((x) => x.id === del.medId);
-        if (!med) continue;
-        const tactic = med.tactics.find((x) => x.linkId === del.linkId);
-        const res = await unlinkTactic(del.linkId, tactic?.id ?? null);
+      // 2) ТАКТИКИ ДИАГНОЗА
+      // 2.1 Удаление
+      for (const linkId of draftTactics.deletedTactics) {
+        const res = await unlinkDiagnosisTactic(linkId);
         if (!res.ok) {
           throw new Error(
-            `Не удалось удалить тактику ${del.linkId}: ${res.error ?? "unknown"}`,
+            `Не удалось удалить тактику ${linkId}: ${res.error ?? "unknown"}`,
+          );
+        }
+      }
+      // 2.2 Обновление существующих
+      for (const t of diagnosisTactics) {
+        if (draftTactics.deletedTactics.includes(t.linkId)) continue;
+        const d = draftTactics.drafts[t.linkId];
+        if (!d) continue;
+        if (d.text !== t.text) {
+          const ok = await updateDiagnosisTacticText(t.linkId, d.text);
+          if (!ok) throw new Error(`Не удалось сохранить тактику ${t.linkId}`);
+        }
+      }
+      // 2.3 Новые
+      for (const n of draftTactics.newTactics) {
+        if (!n.text.trim()) continue;
+        const res = await createDiagnosisTactic(
+          selected.ID,
+          n.text.trim(),
+          n.priority || null,
+        );
+        if (!res.ok) {
+          throw new Error(
+            `Не удалось создать тактику: ${res.error ?? "unknown"}`,
           );
         }
       }
 
-      // 3) Удаление препаратов
+      // 3) УСЛОВИЯ ПРЕПАРАТОВ
+      // 3.1 Удаление условий
+      for (const del of draftMeds.deletedConditions) {
+        const med = medications.find((x) => x.id === del.medId);
+        if (!med) continue;
+        const cond = med.conditions.find((x) => x.linkId === del.linkId);
+        const res = await unlinkTactic(del.linkId, cond?.id ?? null);
+        if (!res.ok) {
+          throw new Error(
+            `Не удалось удалить условие ${del.linkId}: ${res.error ?? "unknown"}`,
+          );
+        }
+      }
+
+      // 3.2 Удаление препаратов
       for (const medId of draftMeds.deletedMeds) {
         const med = medications.find((x) => x.id === medId);
         if (!med) continue;
@@ -353,104 +423,91 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
         }
       }
 
-      // 4) Обновление существующих тактик
+      // 3.3 Обновление существующих условий
       for (const m of medications) {
         if (draftMeds.deletedMeds.includes(m.id)) continue;
         const medDraft = draftMeds.drafts[m.id];
         if (!medDraft) continue;
 
-        for (const t of m.tactics) {
+        for (const c of m.conditions) {
           if (
-            draftMeds.deletedTactics.some(
-              (x) => x.medId === m.id && x.linkId === t.linkId,
+            draftMeds.deletedConditions.some(
+              (x) => x.medId === m.id && x.linkId === c.linkId,
             )
           ) {
             continue;
           }
-          const d = medDraft.tactics[t.linkId];
+          const d = medDraft.conditions[c.linkId];
           if (!d) continue;
 
           const doseA = d.doseA.trim() === "" ? null : Number(d.doseA);
           const doseC = d.doseC.trim() === "" ? null : Number(d.doseC);
 
-          // Текст тактики — в строке связи DIAGNOSIS_MEDICATION_TACTIC
-          if (d.text !== (t.text ?? "")) {
-            const ok = await updateLinkTactikText(t.linkId, d.text || null);
-            if (!ok)
-              throw new Error(`Не удалось сохранить текст тактики ${t.id}`);
-          }
-
-          // Остальные поля — в справочнике TACTIK
           const patch: Record<string, any> = {};
-          if (d.routes !== (t.routes ?? "")) patch.ROUTES = d.routes || null;
-          if (d.condition !== (t.condition ?? ""))
+          if (d.routes !== (c.routes ?? "")) patch.ROUTES = d.routes || null;
+          if (d.condition !== (c.condition ?? ""))
             patch.CONDITION = d.condition || null;
-          if (doseA !== t.doseA) patch.DOSE_A = doseA;
-          if (doseC !== t.doseC) patch.DOSE_C = doseC;
-          // if (d.next !== (t.next ?? "")) patch.NEXT_TACTIK = d.next || null;
-          if (d.priority !== (t.priority ?? ""))
+          if (doseA !== c.doseA) patch.DOSE_A = doseA;
+          if (doseC !== c.doseC) patch.DOSE_C = doseC;
+          if (d.priority !== (c.priority ?? ""))
             patch.PRIORITY = d.priority || null;
 
           if (Object.keys(patch).length > 0) {
-            const ok = await updateTactik(t.id, patch as any);
-            if (!ok) throw new Error(`Не удалось сохранить тактику ${t.id}`);
+            const ok = await updateTactik(c.id, patch as any);
+            if (!ok) throw new Error(`Не удалось сохранить условие ${c.id}`);
           }
         }
       }
 
-      // 5) Новые тактики к существующим препаратам
-      for (const [medIdStr, list] of Object.entries(draftMeds.newTactics)) {
+      // 3.4 Новые условия к существующим препаратам
+      for (const [medIdStr, list] of Object.entries(draftMeds.newConditions)) {
         const medId = Number(medIdStr);
         if (draftMeds.deletedMeds.includes(medId)) continue;
 
-        for (const nt of list) {
-          const doseA = nt.doseA.trim() === "" ? null : Number(nt.doseA);
-          const doseC = nt.doseC.trim() === "" ? null : Number(nt.doseC);
+        for (const nc of list) {
+          const doseA = nc.doseA.trim() === "" ? null : Number(nc.doseA);
+          const doseC = nc.doseC.trim() === "" ? null : Number(nc.doseC);
 
           const res = await linkExistingMedicationWithTactic(
             selected.ID,
             medId,
             {
-              TACTIK_TEXT: nt.text || null,
-              ROUTES: nt.routes || null,
-              CONDITION: nt.condition || null,
+              ROUTES: nc.routes || null,
+              CONDITION: nc.condition || null,
               DOSE_A: doseA,
               DOSE_C: doseC,
-              // NEXT_TACTIK: nt.next || null,
-              PRIORITY: nt.priority || null,
+              PRIORITY: nc.priority || null,
             },
           );
           if (!res.ok) {
             throw new Error(
-              `Не удалось добавить тактику к препарату ${medId}: ${res.error ?? "unknown"}`,
+              `Не удалось добавить условие к препарату ${medId}: ${res.error ?? "unknown"}`,
             );
           }
         }
       }
 
-      // 6) Новые препараты
+      // 3.5 Новые препараты (с одним условием)
       for (const n of draftMeds.newMeds) {
-        const t = n.tactic;
-        const doseA = t.doseA.trim() === "" ? null : Number(t.doseA);
-        const doseC = t.doseC.trim() === "" ? null : Number(t.doseC);
+        const c = n.condition;
+        const doseA = c.doseA.trim() === "" ? null : Number(c.doseA);
+        const doseC = c.doseC.trim() === "" ? null : Number(c.doseC);
 
         if (n.existingId) {
           const res = await linkExistingMedicationWithTactic(
             selected.ID,
             n.existingId,
             {
-              TACTIK_TEXT: t.text || null,
-              ROUTES: t.routes || null,
-              CONDITION: t.condition || null,
+              ROUTES: c.routes || null,
+              CONDITION: c.condition || null,
               DOSE_A: doseA,
               DOSE_C: doseC,
-              // NEXT_TACTIK: t.next || null,
-              PRIORITY: t.priority || null,
+              PRIORITY: c.priority || null,
             },
           );
           if (!res.ok) {
             throw new Error(
-              `Не удалось добавить тактику к препарату ${n.existingId}: ${res.error ?? "unknown"}`,
+              `Не удалось добавить условие к препарату ${n.existingId}: ${res.error ?? "unknown"}`,
             );
           }
         } else {
@@ -460,13 +517,11 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
             UNIT: n.unit.trim() || null,
             CONTENT: n.content.trim() || null,
             RECIPE: n.recipe.trim() || null,
-            TACTIK_TEXT: t.text || null,
-            ROUTES: t.routes || null,
-            CONDITION: t.condition || null,
+            ROUTES: c.routes || null,
+            CONDITION: c.condition || null,
             DOSE_A: doseA,
             DOSE_C: doseC,
-            // NEXT_TACTIK: t.next || null,
-            PRIORITY: t.priority || null,
+            PRIORITY: c.priority || null,
           });
           if (!created) {
             throw new Error(`Не удалось создать препарат "${n.name}"`);
@@ -474,10 +529,10 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
         }
       }
 
-      // 7) Перечитать
-      const [smpRec, meds] = await Promise.all([
+      // 4) Перечитать карту
+      const [smpRec, card] = await Promise.all([
         fetchSmpByIcd10Id(selected.ID),
-        fetchMedicationsForIcd10(selected.ID),
+        fetchDiagnosisCard(selected.ID),
       ]);
       setSmp(smpRec);
 
@@ -485,7 +540,9 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
         ? await fetchTemplateById(Number(smpRec.DISEASE_TEMPLATES_ID))
         : null;
       setTemplate(reloadedTpl);
-      setMedicationsRaw(meds);
+      setMedicationsRaw(card.medications);
+      setDiagnosisTactics(card.tactics);
+      setDraftTactics(tacticsToDrafts(card.tactics));
       setDraftTemplate(templateToDraft(reloadedTpl));
       setDraftMeds(emptyDraftMeds);
       setPickedMed(null);
@@ -509,7 +566,6 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
     [template],
   );
 
-  // Пояснение под общими полями: статуса диагноза в SMP_ICD10
   const templateNotice = useMemo(() => {
     if (!smp)
       return "Диагноз ещё не в базе СМП. «Режим редактирования» добавит его.";
@@ -614,10 +670,10 @@ export default function CallCardScreen({ onBack }: { onBack: () => void }) {
             />
 
             <CallCardTacticsSection
-              medications={medications}
+              tactics={diagnosisTactics}
               isEditing={isEditing}
-              draftMeds={draftMeds}
-              onDraftMedsChange={setDraftMeds}
+              drafts={draftTactics}
+              onDraftsChange={setDraftTactics}
             />
 
             <CallCardRecipesSection

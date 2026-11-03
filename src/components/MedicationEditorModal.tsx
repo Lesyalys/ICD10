@@ -1,19 +1,25 @@
 // src/components/MedicationEditorModal.tsx
 import { useEffect, useState } from "react";
-import { updateAtxAmbulance } from "../DB/queries.ts";
+import { updateAtxAmbulance, type AtxAmbulanceShort } from "../DB/queries.ts";
+
+type Initial = {
+  NAME: string | null;
+  UNIT: string | null;
+  CONTENT: string | null;
+  RECIPE: string | null;
+};
 
 type Props = {
   medId: number;
-  initial: {
-    NAME: string | null;
-    UNIT: string | null;
-    CONTENT: string | null;
-    RECIPE: string | null;
-  };
+  initial: Initial;
   open: boolean;
   onClose: () => void;
   onSaved: () => void;
 };
+
+type Patch = Partial<
+  Pick<AtxAmbulanceShort, "NAME" | "UNIT" | "CONTENT" | "RECIPE">
+>;
 
 export default function MedicationEditorModal({
   medId,
@@ -43,7 +49,11 @@ export default function MedicationEditorModal({
     setSaving(true);
     setError(null);
     try {
-      const patch: Record<string, any> = {};
+      if (!name.trim()) {
+        throw new Error("Название препарата обязательно");
+      }
+
+      const patch: Patch = {};
       if (name !== (initial.NAME ?? "")) patch.NAME = name.trim() || null;
       if (unit !== (initial.UNIT ?? "")) patch.UNIT = unit.trim() || null;
       if (content !== (initial.CONTENT ?? ""))
@@ -58,7 +68,7 @@ export default function MedicationEditorModal({
       onSaved();
       onClose();
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
